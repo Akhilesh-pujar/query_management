@@ -13,13 +13,18 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 import environ # type: ignore
 env = environ.Env()
 environ.Env.read_env()  # Read the .env file
-
+import firebase_admin
+from firebase_admin import credentials
 
 from pathlib import Path
+import os
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+FIREBASE_CREDENTIALS_FILE = os.path.join(BASE_DIR,"credentials/firebase_service_account.json")
+cred = credentials.Certificate(FIREBASE_CREDENTIALS_FILE)
+firebase_admin.initialize_app(cred)
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
@@ -32,6 +37,9 @@ DEBUG = True
 
 ALLOWED_HOSTS = []
 
+APPEND_SLASH = True
+
+AUTH_USER_MODEL = 'api.CustomUser'
 
 # Application definition
 
@@ -43,6 +51,8 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'api',
+    'rest_framework',
+    'corsheaders',
 ]
 
 MIDDLEWARE = [
@@ -54,6 +64,9 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
+MIDDLEWARE.insert(0, 'corsheaders.middleware.CorsMiddleware')
+
+CORS_ORIGIN_ALLOW_ALL = True
 
 ROOT_URLCONF = 'querymanagement.urls'
 
@@ -131,3 +144,15 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# settings.py
+
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+
+EMAIL_HOST = 'smtp.gmail.com'  # Gmail's SMTP server
+EMAIL_PORT = 587  # TLS port
+EMAIL_USE_TLS = True  # Enable TLS
+EMAIL_HOST_USER = 'akhileshspujar163@gmail.com'  # Your Gmail address
+EMAIL_HOST_PASSWORD = 'nnwg tmwt kysg obab'
+DEFAULT_FROM_EMAIL = 'akhileshspujar163@gmail.com'  # The default "from" email address
+

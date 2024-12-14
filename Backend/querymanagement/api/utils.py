@@ -5,26 +5,33 @@ from firebase_admin import messaging # type: ignore
 
 # Generate OTP
 def generate_otp():
-    return str(random.randint(100000, 999999))
+    return random.randint(100000, 999999)
 
-# Send OTP to email
-def send_email_otp(user_email, otp):
-    send_mail(
-        'Your OTP Code',
-        f'Your OTP code is {otp}.',
-        'your_email@example.com',
-        [user_email],
-        fail_silently=False,
-    )
-
+def send_email_otp(email, otp):
+    subject = "Your OTP Code"
+    message = f"Your OTP code is {otp}. It is valid for 5 minutes."
+    from_email = "akhileshspujar163@gmail.com"
+    try:
+        send_mail(subject, message, from_email, [email])
+        return True
+    except Exception as e:
+        return str(e)
+    
+    
 # Send OTP to phone using Firebase
 def send_phone_otp(user_phone, otp):
-    message = messaging.Message(
+    try:
+        message = messaging.Message(
         notification=messaging.Notification(
             title='OTP Verification',
             body=f'Your OTP code is {otp}.',
         ),
         token=user_phone,  # This should be the device token, need Firebase integration
-    )
-    response = messaging.send(message)
-    return response
+     )
+        response = messaging.send(message)
+
+        return response
+
+    except Exception as e:
+        return str(e)
+    

@@ -1,103 +1,110 @@
-# views.py
-from django.shortcuts import get_object_or_404, render, redirect
-from django.contrib.auth import authenticate, login 
-from django.contrib import messages
-from .models import Query, User
+from rest_framework import status
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from .models import OTP
 from .utils import generate_otp, send_email_otp, send_phone_otp
+from django.utils.timezone import now, timedelta
+import json
+from .serializers import UserSerializer
+from django.contrib.auth import authenticate, login
+from .models import Query
+class SendEmailOTPView(APIView):
+    def post(self, request):
+        email = request.data.get("email")
+        contact_number = request.data.get("contactNumber")
 
-def signup(request):
-    if request.method == 'POST':
-        # Get user data from POST request
-        first_name = request.POST.get('first_name')
-        last_name = request.POST.get('last_name')
-        email = request.POST.get('email')
-        phone_number = request.POST.get('phone_number')
-        password = request.POST.get('password')
-        user_type = request.POST.get('user_type')
+        if not email:
+            return Response({"error": "Email is required"}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Create user but do not save yet
-        user = User(
-            first_name=first_name,
-            last_name=last_name,
-            email=email,
-            phone_number=phone_number,
-            user_type=user_type,
-            password=password
-        )
-        
-        # Generate and send OTPs
-        otp_email = generate_otp()
-        otp_phone = generate_otp()
+        email_otp = generate_otp()
+        phone_otp = generate_otp()
+        expires_at = now() + timedelta(minutes=2)
 
-        send_email_otp(email, otp_email)
-        send_phone_otp(phone_number, otp_phone)
+        # Save OTP in the database
+        OTP.objects.create(email=email, phone_otp=phone_otp, email_otp=email_otp, expires_at=expires_at)
 
-        # Save OTPs in the user object temporarily
-        user.otp_email = otp_email
-        user.otp_phone = otp_phone
-        user.save()  # Save before OTP verification
+        # Send OTP via email and phone
+        email_result = send_email_otp(email, email_otp)
+        phone_result = send_phone_otp(contact_number, phone_otp)
 
-        return redirect('verify_otp', user_id=user.id)
-
-    return render(request, 'signup.html')
-
-
-def verify_otp(request, user_id):
-    user = get_object_or_404(User, id=user_id)
-
-    if request.method == 'POST':
-        email_otp = request.POST.get('email_otp')
-        phone_otp = request.POST.get('phone_otp')
-
-        # Check if both OTPs match
-        if email_otp == user.otp_email and phone_otp == user.otp_phone:
-            user.otp_verified_email = True
-            user.otp_verified_phone = True
-            user.save()
-
-            # Redirect to login or dashboard
-            login(request, user)
-            return redirect('dashboard')
-
+        if email_result and phone_result:
+            return Response({"message": "OTP sent successfully"})
         else:
-            messages.error(request, 'Invalid OTP. Please try again.')
+            errors = []
+            if email_result != "":
+                errors.append(f"Failed to send OTP: {email_result}")
+            if phone_result != "":
+                errors.append(f"Failed to send OTP: {phone_result}")
+
+            return Response({"error": " ".join(errors)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class VerifyEmailOTPView(APIView):
+    def post(self, request):
+        data = request.data
+        email = data.get("email")
+        otp = data.get("otp")
+
+        if not email or not otp:
+            return Response({"error": "Email and OTP are required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            otp_record = OTP.objects.get(email=email, email_otp=otp )
+            if not otp_record.is_valid():
+                return Response({"error": "OTP expired"}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Delete OTP after successful verification
+            otp_record.delete()
+            return Response({"message": "OTP verified successfully"})
+        except OTP.DoesNotExist:
+            return Response({"error": "Invalid OTP or email"}, status=status.HTTP_400_BAD_REQUEST)
+
+class SignupView(APIView):
+    def post(self, request):
+        serializer = UserSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
-    return render(request, 'verify_otp.html', {'user': user})
 
+class LoginView(APIView):
+    def post(self, request):
+        username = request.data.get('username')
+        password = request.data.get('password')
 
-def login_view(request):
-    if request.method == 'POST':
-        username = request.POST.get('username')
-        password = request.POST.get('password')
+        if not username or not password:
+            return Response({"error": "Username and password are required"}, status=status.HTTP_400_BAD_REQUEST)
 
         user = authenticate(request, username=username, password=password)
         if user is not None:
             login(request, user)
-            return redirect('dashboard')  # Redirect to appropriate page for the user type
+            return Response({"message": "Login successful"})
         else:
-            messages.error(request, 'Invalid credentials')
-    return render(request, 'login.html')
+            return Response({"error": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
+        
+class QueryListView(APIView):
+    def get(self, request):
+        queries = Query.objects.filter(status='pending')
+        data = [{"id": query.id, "question": query.question, "status": query.status} for query in queries]
+        return Response({"queries": data}, status=status.HTTP_200_OK)
+    
+class AssignQueryView(APIView):
+    def post(self, request, query_id):
+        query = Query.objects.filter(id=query_id).first()
 
-# views.py (continued)
-def query_list(request):
-    queries = Query.objects.filter(status='pending')
-    return render(request, 'query_list.html', {'queries': queries})
+        if not query:
+            return Response({"error": "Query not found"}, status=status.HTTP_404_NOT_FOUND)
 
+        assigned_person = request.data.get('assigned_person')
+        resolution_date = request.data.get('resolution_date')
 
-# views.py (continued)
-def assign_query(request, query_id):
-    query = get_object_or_404(Query, id=query_id)
+        if not assigned_person or not resolution_date:
+            return Response({"error": "Assigned person and resolution date are required"}, status=status.HTTP_400_BAD_REQUEST)
 
-    if request.method == 'POST':
-        assigned_person = request.POST.get('assigned_person')
-        resolution_date = request.POST.get('resolution_date')
-
-        # Update query with assignment details
         query.assigned_person = assigned_person
         query.resolution_date = resolution_date
         query.status = 'resolved'
         query.save()
 
-        return redirect('assigned_queries')
-
-    return render(request, 'assign_query.html', {'query': query})
+        return Response({"message": "Query assigned successfully"})

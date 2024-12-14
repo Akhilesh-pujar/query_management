@@ -1,6 +1,16 @@
-from django.db import models # type: ignore
-from django.contrib.auth.models import AbstractBaseUser, BaseUserManager # type: ignore
+from django.db import models 
+from django.contrib.auth.models import AbstractUser, AbstractBaseUser, BaseUserManager 
+import datetime
 
+class OTP(models.Model):
+    email = models.EmailField(null=True, blank=True)
+    phone_number = models.CharField(max_length=15, null=True, blank=True)
+    email_otp = models.IntegerField()
+    phone_otp = models.IntegerField()
+    expires_at = models.DateTimeField()
+
+    def is_valid(self):
+        return self.expires_at > datetime.datetime.now()
 # Custom User Manager
 class UserManager(BaseUserManager):
     def create_user(self, email, contact_number, password=None, **extra_fields):
@@ -20,6 +30,29 @@ class UserManager(BaseUserManager):
         return self.create_user(email, contact_number, password, **extra_fields)
 
 # Custom User Model
+from django.contrib.auth.models import AbstractUser, Group, Permission
+from django.db import models
+
+class CustomUser(AbstractUser):
+    phone_number = models.CharField(max_length=15, unique=True, null=True, blank=True)
+    user_type = models.CharField(max_length=50, default="user")
+
+    # Specify related_name to avoid conflicts with the default User model
+    groups = models.ManyToManyField(
+        Group,
+        related_name="customuser_set",  # Change the related name
+        blank=True,
+        help_text='The groups this user belongs to. A user will get all permissions granted to each of their groups.',
+        related_query_name='customuser',
+    )
+    user_permissions = models.ManyToManyField(
+        Permission,
+        related_name="customuser_permissions",  # Change the related name
+        blank=True,
+        help_text='Specific permissions for this user.',
+        related_query_name='customuser',
+    )
+
 class User(AbstractBaseUser):
     USER_TYPE_CHOICES = (("Internal", "Internal"), ("Customer", "Customer"))
 
@@ -61,7 +94,7 @@ class QueryHistory(models.Model):
     updated_by = models.ForeignKey(User, on_delete=models.CASCADE)
     comment = models.TextField(null=True, blank=True)
     updated_at = models.DateTimeField(auto_now_add=True)  # auto_now for update timestamps
-      # auto_now_add for creation timestamp
+    created_at = models.DateTimeField(auto_now_add=True)  # auto_now_add for creation timestamp
 
     def __str__(self):
         return f"QueryHistory for Query {self.query.id}, Status: {self.status}"
