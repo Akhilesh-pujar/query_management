@@ -188,7 +188,7 @@ const Query = () => {
     try {
       setUpdating(true)
       const recoilState = useRecoilValue(authAtom);
-      const token = recoilState.token 
+      const token = recoilState.token || // Fallback to AuthContext if token is mis
        if (!token) {
         throw new Error('Token not found, please login again')
       }
