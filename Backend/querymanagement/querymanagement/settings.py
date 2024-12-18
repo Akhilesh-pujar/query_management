@@ -10,21 +10,30 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.1/ref/settings/
 """
 
-import environ # type: ignore
-env = environ.Env()
-environ.Env.read_env()  # Read the .env file
-import firebase_admin
-from firebase_admin import credentials
+import environ 
+
+env = environ.Env(
+    # set casting, default value
+    DEBUG=(bool, False)
+)
+
 
 from pathlib import Path
-import os
+from datetime import timedelta
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-FIREBASE_CREDENTIALS_FILE = os.path.join(BASE_DIR,"credentials/firebase_service_account.json")
-cred = credentials.Certificate(FIREBASE_CREDENTIALS_FILE)
-firebase_admin.initialize_app(cred)
+# FIREBASE_CREDENTIALS_FILE = os.path.join(BASE_DIR,"credentials/firebase_service_account.json")
+# cred = credentials.Certificate(FIREBASE_CREDENTIALS_FILE)
+# firebase_admin.initialize_app(cred)
+environ.Env.read_env(BASE_DIR, '.env')  
+
+DEBUG = env('DEBUG')
+
+SMS_API_KEY="e6b5deb5-bab2-11ef-8b17-0200cd936042"
+
+
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
@@ -39,7 +48,7 @@ ALLOWED_HOSTS = []
 
 APPEND_SLASH = True
 
-AUTH_USER_MODEL = 'api.CustomUser'
+AUTH_USER_MODEL = 'api.User'
 
 # Application definition
 
@@ -50,9 +59,11 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'api',
     'rest_framework',
     'corsheaders',
+    'api',
+  
+   
 ]
 
 MIDDLEWARE = [
@@ -67,6 +78,8 @@ MIDDLEWARE = [
 MIDDLEWARE.insert(0, 'corsheaders.middleware.CorsMiddleware')
 
 CORS_ORIGIN_ALLOW_ALL = True
+
+
 
 ROOT_URLCONF = 'querymanagement.urls'
 
@@ -95,10 +108,10 @@ WSGI_APPLICATION = 'querymanagement.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'mydatabase',  # Retrieve from .env
-        'USER': 'myuser',  # Retrieve from .env
-        'PASSWORD': 'mypassword',  # Retrieve from .env
-        'HOST': 'localhost',
+        'NAME': 'yourdatabase',  # Retrieve from .env
+        'USER': 'yourusername',  # Retrieve from .env
+        'PASSWORD': 'yourpassword',  # Retrieve from .env
+        'HOST': '0.0.0.0',
         'PORT': '5432',  # Default to '5432' if not provided
     }
 }
@@ -120,6 +133,10 @@ AUTH_PASSWORD_VALIDATORS = [
     {
         'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
     },
+]
+AUTHENTICATION_BACKENDS = [
+    'django.contrib.auth.backends.ModelBackend',
+    
 ]
 
 
@@ -156,3 +173,20 @@ EMAIL_HOST_USER = 'akhileshspujar163@gmail.com'  # Your Gmail address
 EMAIL_HOST_PASSWORD = 'nnwg tmwt kysg obab'
 DEFAULT_FROM_EMAIL = 'akhileshspujar163@gmail.com'  # The default "from" email address
 
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ),
+}
+
+from datetime import timedelta
+
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=5),  # Token validity period
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=1),    # Refresh token validity period
+    'ROTATE_REFRESH_TOKENS': True,                 # Generates new refresh token upon use
+    'BLACKLIST_AFTER_ROTATION': True,              # Blacklists old refresh tokens
+    'ALGORITHM': 'HS256',                          # Encryption algorithm
+    'SIGNING_KEY': 'defaultsecret',                     # Use Django's secret key
+    'AUTH_HEADER_TYPES': ('Bearer',),              # Header type
+}

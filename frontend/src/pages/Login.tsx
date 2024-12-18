@@ -1,6 +1,10 @@
+import  { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../hooks/useAuth';
+
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -14,6 +18,10 @@ const loginSchema = z.object({
 type LoginForm = z.infer<typeof loginSchema>;
 
 export default function Login() {
+  const navigate = useNavigate();
+  const { login } = useAuth();
+  const [error, setError] = useState<string | null>(null);
+
   const form = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
@@ -22,9 +30,44 @@ export default function Login() {
     },
   });
 
-  const onSubmit = (data: LoginForm) => {
-    console.log('Login attempt', data);
-    // Here you would typically send the login request to your backend
+  const onSubmit = async (data: LoginForm) => {
+    setError(null);
+    try {
+      const response = await fetch('http://127.0.0.1:8000/api/login/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: data.email,
+          password: data.password
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || 'Login failed');
+      }
+
+      // Ensure userType is consistent (lowercase)
+      const userType = result.userType.toLowerCase();
+
+      // Call login with token and userType
+      login(result.email,result.refreshToken, userType);
+
+      // Navigate based on user type
+      if (userType === 'customer') {
+        navigate('/customer');
+      } else if (userType === 'internal') {
+        navigate('/internal');
+      } else {
+        throw new Error('Invalid user type');
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      setError(error instanceof Error ? error.message : 'Something went wrong');
+    }
   };
 
   return (
@@ -35,6 +78,11 @@ export default function Login() {
           <CardDescription>Enter your credentials to access your account</CardDescription>
         </CardHeader>
         <CardContent>
+          {error && (
+            <div className="text-red-500 text-sm mb-4">
+              {error}
+            </div>
+          )}
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <FormField

@@ -7,16 +7,16 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { useNavigate } from 'react-router-dom';
 
 const signUpSchema = z.object({
-  firstName: z.string().min(2, 'First name must be at least 2 characters'),
-  lastName: z.string().min(2, 'Last name must be at least 2 characters'),
+  first_name: z.string().min(2, 'First name must be at least 2 characters'),
+  last_name: z.string().min(2, 'Last name must be at least 2 characters'),
   email: z.string().email('Invalid email address'),
-  contactNumber: z.string().regex(/^\d{10}$/, 'Contact number must be 10 digits'),
+  contact_number: z.string().regex(/^\d{10}$/, 'Contact number must be 10 digits'),
   password: z.string().min(8, 'Password must be at least 8 characters'),
-  userType: z.enum(['internal', 'customer']),
-  emailOTP: z.string().length(6, 'Email OTP must be 6 digits'),
-  phoneOTP: z.string().length(6, 'Phone OTP must be 6 digits'),
+  user_type: z.enum(['Internal', 'Customer']),
+  otp: z.string().length(6, 'Email OTP must be 6 digits'),
 });
 
 type SignUpForm = z.infer<typeof signUpSchema>;
@@ -24,87 +24,88 @@ type SignUpForm = z.infer<typeof signUpSchema>;
 export default function SignUp() {
   const [otpSent, setOtpSent] = useState(false);
   const [isSignUpEnabled, setSignUpEnabled] = useState(false);
-
+  const navigate = useNavigate();
+  const [session_id, setsession_id] = useState('');
   const form = useForm<SignUpForm>({
     resolver: zodResolver(signUpSchema),
     defaultValues: {
-      firstName: '',
-      lastName: '',
+      first_name: '',
+      last_name: '',
       email: '',
-      contactNumber: '',
+      contact_number: '',
       password: '',
-      userType: 'customer',
-      emailOTP: '',
-      phoneOTP: '',
+      user_type: 'Customer',
+      otp: '111111',
     },
   });
 
   const sendOTP = async () => {
-    const { firstName, lastName, email, contactNumber, password } = form.getValues();
+    const { first_name, last_name, email, contact_number, password,user_type } = form.getValues();
 
-    if (!firstName || !lastName || !email || !contactNumber || !password) {
-      form.setError('firstName', { message: 'First name is required' });
-      form.setError('lastName', { message: 'Last name is required' });
-      form.setError('email', { message: 'Email is required' });
-      form.setError('contactNumber', { message: 'Contact number is required' });
-      form.setError('password', { message: 'Password is required' });
+    // Validate form fields before sending OTP
+    const isValid = await form.trigger(['first_name', 'last_name', 'email', 'contact_number', 'password','user_type']);
+    if (!isValid) {
       return;
     }
 
     try {
-      const response = await fetch('http://127.0.0.1:8000/api/send-email-otp/', {
+      const response = await fetch('http://127.0.0.1:8000/api/userdata-cache-withotp/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ firstName, lastName, email, contactNumber, password }),
+        body: JSON.stringify({
+          first_name,
+          last_name,
+          email,
+          contact_number,
+          password,
+          user_type,
+        }),
       });
       
 
-      if (!response.ok ) {
-        throw new Error('');
+      if (!response.ok) {
+        const errorData = await response.text();
+        throw new Error(errorData || 'Failed to send OTP');
       }
-
       const result = await response.json();
-      
-      if (result.success) {
-        form.setValue('emailOTP', result.emailOTP); // Optionally prefill the OTP fields for testing
-        form.setValue('phoneOTP', result.phoneOTP); // Optionally prefill the OTP fields for testing
-        setOtpSent(true);
-        setSignUpEnabled(true);
-        alert('OTP sent successfully to your email and phone');
-      } else {
-        throw new Error(result.message || 'Failed to send OTP');
-      }
+      setOtpSent(true);
+      setSignUpEnabled(true);
+      setsession_id(result.session_id);
+      alert('OTP sent successfully to your email');
     } catch (error) {
       console.error('Error:', error);
-      alert('Failed to send OTP. Please try again.');
+      alert(error instanceof Error ? error.message : 'Failed to send OTP. Please try again.');
     }
   };
 
   const onSubmit = async (data: SignUpForm) => {
     try {
-      const response = await fetch('http://127.0.0.1:8000/admin/api/signup/', {
+      const response = await fetch('http://127.0.0.1:8000/api/userdata-verify-save/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify({
+          session_id,
+          otp:data.otp,
+        
+        }),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to sign up');
+        const errorText = await response.text();
+        throw new Error(errorText || 'Failed to sign up');
       }
 
       const result = await response.json();
-      if (result.success) {
-        alert('Sign up successful');
-      } else {
-        throw new Error(result.message || 'Failed to sign up');
-      }
+      console.log("Signup response:", result);
+      alert('Sign up successful');
+      navigate("/login");
     } catch (error) {
       console.error('Error:', error);
-      alert('Something went wrong. Please try again.');
+      alert(error instanceof Error ? error.message : 'Something went wrong. Please try again.');
     }
   };
 
@@ -121,7 +122,7 @@ export default function SignUp() {
               <div className="grid grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
-                  name="firstName"
+                  name="first_name"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>First Name</FormLabel>
@@ -134,7 +135,7 @@ export default function SignUp() {
                 />
                 <FormField
                   control={form.control}
-                  name="lastName"
+                  name="last_name"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Last Name</FormLabel>
@@ -161,7 +162,7 @@ export default function SignUp() {
               />
               <FormField
                 control={form.control}
-                name="contactNumber"
+                name="contact_number"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Contact Number</FormLabel>
@@ -187,7 +188,7 @@ export default function SignUp() {
               />
               <FormField
                 control={form.control}
-                name="userType"
+                name="user_type"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>User Type</FormLabel>
@@ -198,8 +199,8 @@ export default function SignUp() {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="internal">Internal</SelectItem>
-                        <SelectItem value="customer">Customer</SelectItem>
+                        <SelectItem value="Internal">Internal</SelectItem>
+                        <SelectItem value="Customer">Customer</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -210,26 +211,13 @@ export default function SignUp() {
                 {otpSent ? 'OTP Sent' : 'Send OTP'}
               </Button>
               {otpSent && (
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4">
                   <FormField
                     control={form.control}
-                    name="emailOTP"
+                    name="otp"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Email OTP</FormLabel>
-                        <FormControl>
-                          <Input {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="phoneOTP"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Phone OTP</FormLabel>
                         <FormControl>
                           <Input {...field} />
                         </FormControl>

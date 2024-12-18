@@ -1,100 +1,197 @@
-from django.db import models 
-from django.contrib.auth.models import AbstractUser, AbstractBaseUser, BaseUserManager 
-import datetime
+from datetime import timezone
+from django.db import models
+from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
+from django.core.validators import RegexValidator
 
-class OTP(models.Model):
-    email = models.EmailField(null=True, blank=True)
-    phone_number = models.CharField(max_length=15, null=True, blank=True)
-    email_otp = models.IntegerField()
-    phone_otp = models.IntegerField()
-    expires_at = models.DateTimeField()
-
-    def is_valid(self):
-        return self.expires_at > datetime.datetime.now()
-# Custom User Manager
 class UserManager(BaseUserManager):
     def create_user(self, email, contact_number, password=None, **extra_fields):
         if not email:
-            raise ValueError("Email is required")
+            raise ValueError("The Email field is required.")
         if not contact_number:
-            raise ValueError("Contact number is required")
+            raise ValueError("The Contact Number field is required.")
 
-        user = self.model(email=self.normalize_email(email), contact_number=contact_number, **extra_fields)
+        # Normalize email
+        email = self.normalize_email(email)
+       
+        # Avoid email duplication in extra_fields
+        extra_fields.pop('email', None)
+
+        user = self.model(email=email, contact_number=contact_number, **extra_fields)
         user.set_password(password)
         user.save(using=self._db)
         return user
 
     def create_superuser(self, email, contact_number, password=None, **extra_fields):
-        extra_fields.setdefault("is_staff", True)
-        extra_fields.setdefault("is_superuser", True)
+        extra_fields.setdefault('is_staff', True)
+        extra_fields.setdefault('is_superuser', True)
+        extra_fields.setdefault('is_active', True)
+
+        if not extra_fields.get('is_staff'):
+            raise ValueError("Superuser must have is_staff=True.")
+        if not extra_fields.get('is_superuser'):
+            raise ValueError("Superuser must have is_superuser=True.")
+
         return self.create_user(email, contact_number, password, **extra_fields)
 
-# Custom User Model
-from django.contrib.auth.models import AbstractUser, Group, Permission
-from django.db import models
-
-class CustomUser(AbstractUser):
-    phone_number = models.CharField(max_length=15, unique=True, null=True, blank=True)
-    user_type = models.CharField(max_length=50, default="user")
-
-    # Specify related_name to avoid conflicts with the default User model
-    groups = models.ManyToManyField(
-        Group,
-        related_name="customuser_set",  # Change the related name
-        blank=True,
-        help_text='The groups this user belongs to. A user will get all permissions granted to each of their groups.',
-        related_query_name='customuser',
-    )
-    user_permissions = models.ManyToManyField(
-        Permission,
-        related_name="customuser_permissions",  # Change the related name
-        blank=True,
-        help_text='Specific permissions for this user.',
-        related_query_name='customuser',
+class User(AbstractBaseUser, PermissionsMixin):
+    USER_TYPE_CHOICES = (
+        ("Internal", "Internal"),
+        ("Customer", "Customer"),
     )
 
-class User(AbstractBaseUser):
-    USER_TYPE_CHOICES = (("Internal", "Internal"), ("Customer", "Customer"))
+    phone_regex = RegexValidator(
+        regex=r'^\+?1?\d{9,15}$', 
+        message="Phone number must be entered in the format: '+999999999'. Up to 15 digits allowed."
+    )
 
     first_name = models.CharField(max_length=50)
     last_name = models.CharField(max_length=50)
     email = models.EmailField(unique=True)
-    contact_number = models.CharField(max_length=15, unique=True)
+    contact_number = models.CharField(
+        validators=[phone_regex], 
+        max_length=17, 
+        unique=True
+    )
     user_type = models.CharField(max_length=10, choices=USER_TYPE_CHOICES)
     email_otp = models.CharField(max_length=6, blank=True, null=True)
-    contact_otp = models.CharField(max_length=6, blank=True, null=True)
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
     is_superuser = models.BooleanField(default=False)
 
+    # Custom manager
     objects = UserManager()
 
-    USERNAME_FIELD = "email"
-    REQUIRED_FIELDS = ["contact_number"]
+    USERNAME_FIELD = 'email'
+    REQUIRED_FIELDS = ['contact_number', 'first_name', 'last_name', 'user_type']
 
-class Query(models.Model):
-    PRIORITY_CHOICES = (("Low", "Low"), ("Medium", "Medium"), ("High", "High"))
+    def __str__(self):
+        return self.email
 
-    query_number = models.AutoField(primary_key=True)
-    title = models.CharField(max_length=255)
-    subject = models.CharField(max_length=255)
-    query_to = models.CharField(max_length=255)
-    priority = models.CharField(max_length=10, choices=PRIORITY_CHOICES)
-    description = models.TextField()
-    attachment = models.FileField(upload_to="attachments/", null=True, blank=True)
-    status = models.CharField(max_length=10, choices=[("Pending", "Pending"), ("Resolved", "Resolved")], default="Pending")
-    created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name="queries")
-    assigned_to = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="assigned_queries")
+    def get_full_name(self):
+        return f"{self.first_name} {self.last_name}"
+
+    def get_short_name(self):
+        return self.first_name
+
+    def has_perm(self, perm, obj=None):
+        return self.is_superuser
+
+    def has_module_perms(self, app_label):
+        return self.is_superuser
+
+class Department(models.Model):
+    """
+    Model to manage different departments dynamically
+    """
+    DEPARTMENT_STATUS_CHOICES = (
+        ('ITSUPPORT', 'ITSUPPORT'),
+        ('IT_TEAM', 'IT_TEAM'),
+        ('HARDWARE SUPPORT','HARDWARE SUPPORT')
+    )
+
+    name = models.CharField(max_length=100, unique=True)
+    code = models.CharField(max_length=20, unique=True)
+    description = models.TextField(blank=True, null=True)
+    status = models.CharField(
+        max_length=20, 
+        choices=DEPARTMENT_STATUS_CHOICES, 
+        default='ITSUPPORT'
+    )
+    query_to_id = models.ForeignKey(
+        'Query', 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True,
+        related_name="linked_departments"
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
-class QueryHistory(models.Model):
-    query = models.ForeignKey(Query, on_delete=models.CASCADE, related_name="history")
-    status = models.CharField(max_length=10, choices=[("Pending", "Pending"), ("Resolved", "Resolved")])
-    updated_by = models.ForeignKey(User, on_delete=models.CASCADE)
-    comment = models.TextField(null=True, blank=True)
-    updated_at = models.DateTimeField(auto_now_add=True)  # auto_now for update timestamps
-    created_at = models.DateTimeField(auto_now_add=True)  # auto_now_add for creation timestamp
+    def __str__(self):
+        return f"{self.name} ({self.code})"
+
+    class Meta:
+        verbose_name_plural = "Departments"
+        ordering = ['name']
+
+class Query(models.Model):
+    PRIORITY_CHOICES = (
+        ("Low", "Low"), 
+        ("Medium", "Medium"), 
+        ("High", "High")
+    )
+    
+    STATUS_CHOICES = [
+        ("Pending", "Pending"), 
+        ("Resolved", "Resolved"),
+        ("In Progress", "In Progress"),
+        ("Closed", "Closed")
+    ]
+    
+    query_number = models.CharField(max_length=50, primary_key=True, unique=True)
+    user = models.ForeignKey(
+        User, 
+        on_delete=models.CASCADE, 
+        related_name='customer_queries',
+        null=True,  # Allow null to handle potential user deletion scenarios
+        blank=True
+    )
+    title = models.CharField(max_length=255)
+    subject = models.CharField(max_length=255)
+    query_to = models.ForeignKey(
+        Department, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True, 
+        related_name="queries"
+    )
+    priority = models.CharField(max_length=10, choices=PRIORITY_CHOICES, default="Low")
+    description = models.TextField()
+    attachment = models.FileField(upload_to="attachments/", null=True, blank=True)
+    status = models.CharField(
+        max_length=20, 
+        choices=STATUS_CHOICES, 
+        default="Pending"
+    )
+    created_by = models.ForeignKey(
+        User, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        related_name="created_queries"
+    )
+    assigned_to = models.ForeignKey(
+        User, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True, 
+        related_name="assigned_queries"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def save(self, *args, **kwargs):
+        # Generate query number if not provided
+        if not self.query_number:
+            from django.utils.crypto import get_random_string
+            timestamp = self.created_at.strftime('%Y%m%d') if self.created_at else timezone.now().strftime('%Y%m%d')
+            random_suffix = get_random_string(length=6, allowed_chars='0123456789')
+            self.query_number = f'QRY-{timestamp}-{random_suffix}'
+        
+        super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"QueryHistory for Query {self.query.id}, Status: {self.status}"
+        return f"{self.title} - {self.query_number}"
+
+class QueryHistory(models.Model):
+    query = models.ForeignKey(Query, on_delete=models.CASCADE, related_name="history")
+    status = models.CharField(
+        max_length=20, 
+        choices=Query.STATUS_CHOICES
+    )
+    updated_by = models.ForeignKey(User, on_delete=models.CASCADE)
+    comment = models.TextField(null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"QueryHistory for Query {self.query.query_number}, Status: {self.status}"

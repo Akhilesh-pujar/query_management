@@ -1,122 +1,376 @@
-import { useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
- 
- import { Textarea } from '@/components/ui/textarea'
-import { Tickets, TimelineEvent } from '../data/Ticket'
-import AllQueries from './Query_pagination'
-export default function Query() {
-  const { id } = useParams<{ id: string }>()
-  const ticket = Tickets.find(t => t.id === parseInt(id || ''))
-  const [isDialogOpen, setIsDialogOpen] = useState(false)
-  
+import { useState, useEffect } from 'react'
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import {
+  Table,
+  TableBody,
+  TableCaption,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter
+} from "@/components/ui/dialog"
 
-  if (!ticket) {
-    return <div>Ticket not found</div>
+import { Toaster } from '@/components/ui/toaster'
+import { toast } from '@/hooks/use-toast'
+
+import { authAtom } from '@/recoil/authAtom'
+import { useRecoilValue } from 'recoil'
+
+export type Priority = 'Low' | 'Medium' | 'High'
+export type Status = 'open' | 'in-progress' | 'resolved'
+
+export interface QueryInterface {
+  serialNumber: number
+  queryNumber: string
+  dateRaised: string
+  title: string
+  subject: string
+  queryTo: string
+  priority: Priority
+  description: string
+  attachment?: File
+  assignedTo?: string
+  resolutionDate?: string
+  status: Status
+}
+
+export interface APIQueryResponse {
+  serialNumber: number
+  queryNumber: string
+  dateRaised: string
+  title: string
+  subject: string
+  queryTo: string
+  priority: Priority
+  description: string
+  assignedTo: string | null
+  resolutionDate: string | null
+  status: Status
+}
+
+export interface UpdateQueryPayload {
+  assignedTo: string
+  status: Status
+  queryTo: string
+}
+
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000'
+
+const Query = () => {
+  const [queries, setQueries] = useState<QueryInterface[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [selectedQuery, setSelectedQuery] = useState<QueryInterface | null>(null)
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [formData, setFormData] = useState<UpdateQueryPayload>({
+    assignedTo: '',
+    status: 'open',
+    queryTo: '',
+  })
+  const [updating, setUpdating] = useState(false)
+
+  useEffect(() => {
+    fetchQueries()
+  }, [])
+
+  const mapAPIResponseToQuery = (apiQuery: APIQueryResponse): QueryInterface => ({
+    ...apiQuery,
+    assignedTo: apiQuery.assignedTo || undefined,
+    resolutionDate: apiQuery.resolutionDate || undefined,
+  })
+
+  const fetchQueries = async () => {
+    try {
+      setError(null)
+      const email = localStorage.getItem('email')
+      
+      if (!email) {
+        throw new Error('No email found in localStorage')
+      }
+
+      const response = await fetch(`${API_URL}/api/queries/internalqueries/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email }),
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const data = await response.json()
+      
+      if (!Array.isArray(data)) {
+        throw new Error('Invalid data format received from server')
+      }
+
+      setQueries(data.map(mapAPIResponseToQuery))
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred'
+      setError(errorMessage)
+      toast({
+        variant: "destructive",
+        title: "Error fetching queries",
+        description: errorMessage,
+      })
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString()
+  const handleUpdate = async (query: QueryInterface, updates: Partial<UpdateQueryPayload>) => {
+    try {
+      setError(null)
+      const response = await fetch(`${API_URL}/api/queries/update/${query.serialNumber}/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          assignedTo: updates.assignedTo ?? query.assignedTo ?? '',
+          status: updates.status ?? query.status,
+          queryTo: updates.queryTo ?? query.queryTo,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const updatedData: APIQueryResponse = await response.json()
+      
+      setQueries(prevQueries => 
+        prevQueries.map(q =>
+          q.serialNumber === query.serialNumber
+            ? mapAPIResponseToQuery(updatedData)
+            : q
+        )
+      )
+
+      toast({
+        title: "Success",
+        description: "Query updated successfully",
+      })
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred'
+      setError(errorMessage)
+      toast({
+        variant: "destructive",
+        title: "Error updating query",
+        description: errorMessage,
+      })
+    }
   }
 
-  const handleAddProgress = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    // Here you would typically send this data to your backend
-    // For now, we'll just close the dialog
-    setIsDialogOpen(false)
+
+  const handleSubmit = async () => {
+    if (!selectedQuery) return
+
+    try {
+      setUpdating(true)
+      const recoilState = useRecoilValue(authAtom);
+      const token = recoilState.token 
+       if (!token) {
+        throw new Error('Token not found, please login again')
+      }
+      const response = await fetch('http://127.0.0.1:8000/api/queries/update/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          ...formData,
+        queryNumber: selectedQuery.queryNumber
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const updatedData: APIQueryResponse = await response.json()
+      
+      setQueries(prevQueries => 
+        prevQueries.map(q =>
+          q.serialNumber === selectedQuery.serialNumber
+            ? mapAPIResponseToQuery(updatedData)
+            : q
+        )
+      )
+
+      toast({
+        title: "Success",
+        description: "Query updated successfully",
+      })
+      setDialogOpen(false)
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred'
+      toast({
+        variant: "destructive",
+        title: "Error updating query",
+        description: errorMessage,
+      })
+    } finally {
+      setUpdating(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="container mx-auto p-4 flex items-center justify-center">
+        <div className="text-lg">Loading...</div>
+      </div>
+    )
+  }
+
+
+  if (error) {
+    return (
+      <div className="container mx-auto p-4">
+        <div className="bg-destructive/15 border border-destructive text-destructive rounded-lg p-4">
+          Error: {error}
+        </div>
+      </div>
+    )
   }
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold">{ticket.name}</h1>
-      <Card>
-        <CardHeader>
-          <CardTitle>Ticket Details</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <p className="text-sm font-medium text-gray-500">Assigned To:</p>
-            <p>{ticket.assignedTo}</p>
-          </div>
-          <div>
-            <p className="text-sm font-medium text-gray-500">Department:</p>
-            <p>{ticket.department}</p>
-          </div>
-          <div>
-            <p className="text-sm font-medium text-gray-500">Status:</p>
-            <Badge variant={ticket.status === 'pending' ? 'warning' : 'success'}>
-              {ticket.status}
-            </Badge>
-          </div>
-          <div>
-            <p className="text-sm font-medium text-gray-500">Created By:</p>
-            <p>{ticket.createdBy}</p>
-          </div>
-          <div>
-            <p className="text-sm font-medium text-gray-500">Created At:</p>
-            <p>{formatDate(ticket.createdAt)}</p>
-          </div>
-          <div>
-            <p className="text-sm font-medium text-gray-500">Last Updated:</p>
-            <p>{formatDate(ticket.lastUpdated)}</p>
-          </div>
-          <div>
-            <p className="text-sm font-medium text-gray-500">Details:</p>
-            <p>{ticket.details}</p>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Timeline</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ol className="relative border-l border-gray-200 dark:border-gray-700">
-            {ticket.timeline.map((event: TimelineEvent) => (
-              <li key={event.id} className="mb-10 ml-4">
-                <div className="absolute w-3 h-3 bg-gray-200 rounded-full mt-1.5 -left-1.5 border border-white dark:border-gray-900 dark:bg-gray-700"></div>
-                <time className="mb-1 text-sm font-normal leading-none text-gray-400 dark:text-gray-500">{formatDate(event.date)}</time>
-                <p className="text-base font-normal text-gray-500 dark:text-gray-400">{event.description}</p>
-              </li>
-            ))}
-          </ol>
-        </CardContent>
-      </Card>
-
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogTrigger asChild>
-          <Button>Add Progress / Resolution</Button>
-        </DialogTrigger>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Add Progress / Resolution</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleAddProgress} className="space-y-4">
-            <div>
-              <label htmlFor="progress" className="text-sm font-medium text-gray-700">Progress / Resolution</label>
-              <Textarea id="progress" placeholder="Describe the progress or resolution..." />
-            </div>
-            <div>
-              <label htmlFor="status" className="text-sm font-medium text-gray-700">New Status</label>
-              <select id="status" className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
-                <option value="pending">Pending</option>
-                <option value="resolved">Resolved</option>
-              </select>
-            </div>
-            <Button type="submit">Submit</Button>
-          </form>
-        </DialogContent>
-      </Dialog>
-      <AllQueries/>
-
-      <Button asChild variant="outline">
-        <Link to="/">Back to Tickets</Link>
-      </Button>
+    <div className="container mx-auto p-4">
+    <Toaster />
+    <h1 className="text-2xl font-bold mb-4">Internal Query Management</h1>
+    
+    <Table>
+      <TableCaption>List of Customer Queries</TableCaption>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Serial No.</TableHead>
+          <TableHead>Query Number</TableHead>
+          <TableHead>Date Raised</TableHead>
+          <TableHead>Subject</TableHead>
+          <TableHead>Query To</TableHead>
+          <TableHead>Assigned To</TableHead>
+          <TableHead>Resolution Date</TableHead>
+          <TableHead>Status</TableHead>
+          <TableHead>Actions</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {queries.map((query) => (
+          <TableRow key={query.queryNumber}>
+            <TableCell>{query.serialNumber}</TableCell>
+            <TableCell>{query.queryNumber}</TableCell>
+            <TableCell>{query.dateRaised}</TableCell>
+            <TableCell>{query.subject}</TableCell>
+            <TableCell>{query.queryTo}</TableCell>
+            <TableCell>{query.assignedTo || 'Unassigned'}</TableCell>
+            <TableCell>{query.resolutionDate || 'N/A'}</TableCell>
+            <TableCell>{query.status}</TableCell>
+            <TableCell>
+              <Dialog open={dialogOpen && selectedQuery?.serialNumber === query.serialNumber} 
+                     onOpenChange={(open) => {
+                       setDialogOpen(open)
+                       if (open) {
+                         setSelectedQuery(query)
+                       } else {
+                         setSelectedQuery(null)
+                       }
+                     }}>
+                <DialogTrigger asChild>
+                  <Button variant="outline">Manage</Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Manage Query: {query.queryNumber}</DialogTitle>
+                  </DialogHeader>
+                  <div className="grid gap-4 py-4">
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <label htmlFor="queryTo">Query To:</label>
+                      <Select
+                        onValueChange={(value) => setFormData(prev => ({ ...prev, queryTo: value }))}
+                        value={formData.queryTo}
+                      >
+                        <SelectTrigger className="col-span-3">
+                          <SelectValue placeholder="Select department" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Sales Department">Sales Department</SelectItem>
+                          <SelectItem value="IT Support">IT Support</SelectItem>
+                          <SelectItem value="Customer Service">Customer Service</SelectItem>
+                          <SelectItem value="Technical Team">Technical Team</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <label htmlFor="assignTo">Assign to:</label>
+                      <Input
+                        id="assignTo"
+                        value={formData.assignedTo}
+                        className="col-span-3"
+                        onChange={(e) => setFormData(prev => ({ ...prev, assignedTo: e.target.value }))}
+                      />
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <label htmlFor="status">Status:</label>
+                      <Select
+                        onValueChange={(value) => setFormData(prev => ({ ...prev, status: value as Status }))}
+                        value={formData.status}
+                      >
+                        <SelectTrigger className="col-span-3">
+                          <SelectValue placeholder="Select status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="open">Open</SelectItem>
+                          <SelectItem value="in-progress">In Progress</SelectItem>
+                          <SelectItem value="resolved">Resolved</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setDialogOpen(false)}
+                    >
+                      Cancel
+                    </Button>
+                    <Button 
+                      onClick={handleSubmit}
+                      disabled={updating}
+                    >
+                      {updating ? 'Updating...' : 'Submit'}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
     </div>
   )
 }
+
+export default Query
+
 

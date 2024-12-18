@@ -1,22 +1,25 @@
 from django.urls import path
-from . import views
-from api.views import SignupView,SendEmailOTPView, VerifyEmailOTPView, QueryListView,AssignQueryView,LoginView
 
+from api.views import SignupInitView,VerifyEmailOTPView, VerifyEmailOTPView, QueryListView,AssignQueryView,LoginView,RaiseQueryView,UpdateQueryView,QueryByDepartmentView,ProtectedView,QueryToChoicesView,InternalQueryView
+from rest_framework_simplejwt.views import(TokenObtainPairView, TokenRefreshView)
 urlpatterns = [
     # Authentication URLs
-    path('signup/', SignupView.as_view(), name='signup'),  # Sign-up page
-   path("send-email-otp/", SendEmailOTPView.as_view(), name="send_email_otp"),
-    path("verify-email-otp/", VerifyEmailOTPView.as_view(), name="verify_email_otp"),
-
-   
-  # OTP verification page
-    path('login/', LoginView.as_view(), name='login'),  # Login page
+   path('userdata-cache-withotp/', SignupInitView.as_view(), name='signup'),  # Sign-up page
+   path("userdata-verify-save/", VerifyEmailOTPView.as_view(), name="send_email_otp"),
     
-    # Customer User URLs
-    
-    path('customer/query-list/', QueryListView.as_view(), name='query_list'),  # View list of queries
+   path('login/', LoginView.as_view(), name='login'),  # Login page
 
-    # Internal User URLs
-    path('internal/assign-query/<int:query_id>/', AssignQueryView.as_view(), name='assign_query'),  # Assign query page
-    #path('internal/assigned-queries/', views.query_list, name='assigned_queries'),  # View assigned queries (reuse query_list for simplicity)
+    path('queries/create/', RaiseQueryView.as_view(), name='create-query'),
+    path('queries/list/', QueryListView.as_view(), name='query-list'),
+    path('queries/internalqueries/', InternalQueryView.as_view(), name='query-list'),
+    path('queries/update/', UpdateQueryView.as_view(), name='update-query'),
+    path('queries/assign/<int:pk>/', AssignQueryView.as_view(), name='assign-query'),
+    path('queries/department/<str:department>/', QueryByDepartmentView.as_view(), name='query-by-department'),
+
+    path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    
+    path('api/protected/', ProtectedView.as_view(), name='protected'),
+    path('queries/to-choices/', QueryToChoicesView.as_view(), name='query-to-choices'),
+  
 ]
