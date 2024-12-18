@@ -90,8 +90,8 @@ class QuerySerializer(serializers.ModelSerializer):
     def get_query_to_choices(self, value):
         # Fetch departments for dropdown
          try:
-            department = Department.objects.get(name=value)
-            return department
+            department = Department.objects.get(name=value.query_to)
+            return department.name
          except Department.DoesNotExist:
             raise serializers.ValidationError("Invalid department name")
          

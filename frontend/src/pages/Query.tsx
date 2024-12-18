@@ -188,8 +188,8 @@ const Query = () => {
     try {
       setUpdating(true)
       const recoilState = useRecoilValue(authAtom);
-      const token = recoilState.token || // Fallback to AuthContext if token is mis
-       if (!token) {
+      const token = recoilState.token  // Fallback to AuthContext if token is mis
+       if(!token) {
         throw new Error('Token not found, please login again')
       }
       const response = await fetch('http://127.0.0.1:8000/api/queries/update/', {

@@ -79,7 +79,11 @@ MIDDLEWARE.insert(0, 'corsheaders.middleware.CorsMiddleware')
 
 CORS_ORIGIN_ALLOW_ALL = True
 
-
+CORS_ALLOW_HEADERS = [
+    'content-type',
+    'X-User-Email',  # Add custom header for email
+    # other headers you need to allow
+]
 
 ROOT_URLCONF = 'querymanagement.urls'
 
@@ -105,16 +109,16 @@ WSGI_APPLICATION = 'querymanagement.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
-# DATABASES = {
-#     'default': {
-#         'ENGINE': 'django.db.backends.postgresql',
-#         'NAME': 'yourdatabase',  # Retrieve from .env
-#         'USER': 'yourusername',  # Retrieve from .env
-#         'PASSWORD': 'yourpassword',  # Retrieve from .env
-#         'HOST': '0.0.0.0',
-#         'PORT': '5432',  # Default to '5432' if not provided
-#     }
-# }
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'yourdatabase',  # Retrieve from .env
+        'USER': 'yourusername',  # Retrieve from .env
+        'PASSWORD': 'yourpassword',  # Retrieve from .env
+        'HOST': '0.0.0.0',
+        'PORT': '5432',  # Default to '5432' if not provided
+    }
+}
 
 
 # Password validation
@@ -165,13 +169,12 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # settings.py
 
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-
-# EMAIL_HOST = 'smtp.gmail.com'  # Gmail's SMTP server
-# EMAIL_PORT = 587  # TLS port
-# EMAIL_USE_TLS = True  # Enable TLS
-# EMAIL_HOST_USER = 'akhileshspujar163@gmail.com'  # Your Gmail address
-# EMAIL_HOST_PASSWORD = 'nnwg tmwt kysg obab'
-# DEFAULT_FROM_EMAIL = 'akhileshspujar163@gmail.com'  # The default "from" email address
+EMAIL_HOST = 'smtp.gmail.com'  # Gmail's SMTP server
+EMAIL_PORT = 587  # TLS port
+EMAIL_USE_TLS = True  # Enable TLS
+EMAIL_HOST_USER = 'akhileshspujar163@gmail.com'  # Your Gmail address
+EMAIL_HOST_PASSWORD = 'nnwg tmwt kysg obab'
+DEFAULT_FROM_EMAIL = 'akhileshspujar163@gmail.com'  # The default "from" email address
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (

@@ -1,4 +1,4 @@
-from datetime import timezone
+from datetime import datetime
 from django.db import models
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 from django.core.validators import RegexValidator
@@ -54,6 +54,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     )
     user_type = models.CharField(max_length=10, choices=USER_TYPE_CHOICES)
     email_otp = models.CharField(max_length=6, blank=True, null=True)
+    
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
     is_superuser = models.BooleanField(default=False)
@@ -171,11 +172,11 @@ class Query(models.Model):
 
     def save(self, *args, **kwargs):
         # Generate query number if not provided
-        if not self.query_number:
-            from django.utils.crypto import get_random_string
-            timestamp = self.created_at.strftime('%Y%m%d') if self.created_at else timezone.now().strftime('%Y%m%d')
-            random_suffix = get_random_string(length=6, allowed_chars='0123456789')
-            self.query_number = f'QRY-{timestamp}-{random_suffix}'
+        # if not self.query_number:
+        #     from django.utils.crypto import get_random_string
+        #     timestamp = self.created_at.strftime('%Y%m%d') if self.created_at else timezone.now().strftime('%Y%m%d')
+        #     random_suffix = get_random_string(length=6, allowed_chars='0123456789')
+        #     self.query_number = f'QRY-{timestamp}-{random_suffix}'
         
         super().save(*args, **kwargs)
 

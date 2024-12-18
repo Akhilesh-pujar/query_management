@@ -223,6 +223,7 @@ export default function SignUp() {
                         </FormControl>
                         <FormMessage />
                       </FormItem>
+                      
                     )}
                   />
                 </div>

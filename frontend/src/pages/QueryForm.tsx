@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -9,7 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useAuth } from '../hooks/useAuth';
+
 import { useForm } from 'react-hook-form';
 
 interface QueryFormData {
@@ -20,7 +20,7 @@ interface QueryFormData {
   priority: "Low" | "Medium" | "High";
   description: string;
   status: "pending" | "in-progress";
-  email: string;
+  
   attachment?: File | undefined;
 }
 
@@ -38,7 +38,7 @@ function generateQueryNumber(): string {
 export const QueryForm: React.FC<QueryFormProps> = ({ onSubmit }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { token } = useAuth();
+  
 
   const { register, handleSubmit, setValue, watch, formState: { errors } } = useForm<QueryFormData>({
     defaultValues: {
@@ -48,19 +48,10 @@ export const QueryForm: React.FC<QueryFormProps> = ({ onSubmit }) => {
     },
   });
 
-  useEffect(() => {
-    const cachedEmail = localStorage.getItem("email");
+  
+   
     
 
-    
-    if (cachedEmail) {
-      setValue("email", cachedEmail);
-    } else {
-      const email = "user@example.com"; // Replace with actual email logic
-      localStorage.setItem("email", email);
-      setValue("email", email);
-    }
-  }, [token, setValue]);
 
   const validateForm = (data: QueryFormData): string | null => {
     if (!data.title || data.title.length < 3) return "Title must be at least 3 characters long.";
@@ -69,6 +60,7 @@ export const QueryForm: React.FC<QueryFormProps> = ({ onSubmit }) => {
     if (!data.description || data.description.length < 10) return "Description must be at least 10 characters long.";
     return null;
   };
+ 
   const onSubmitForm = async (data: QueryFormData) => {
     const validationError = validateForm(data);
     if (validationError) {
@@ -80,18 +72,30 @@ export const QueryForm: React.FC<QueryFormProps> = ({ onSubmit }) => {
     setError(null);
   
     const formData = new FormData();
-    Object.entries(data).forEach(([key, value]) => {
-      if (key === "attachment" && value instanceof FileList && value.length > 0) {
-        formData.append(key, value[0]); // Handle file uploads
-      } else {
-        formData.append(key, value as string);
-      }
-    });
-  
+  Object.entries(data).forEach(([key, value]) => {
+    if (key === "attachment" && value instanceof FileList && value.length > 0) {
+      formData.append(key, value[0]); // Handle file uploads
+    } else {
+      formData.append(key, value as string);
+    }
+  });
+
+  // Add email to the form data
+  const cachedEmail = localStorage.getItem("email");
+  if (cachedEmail) {
+    formData.append("email", cachedEmail); // Add the email to the form data
+  }
+
     try {
+      const cachedEmail = localStorage.getItem("email")|| "akhileshpujar796@gmail.com";
+      console.log(cachedEmail)
       const response = await fetch("http://127.0.0.1:8000/api/queries/create/", {
         method: "POST",
-        body: formData, // Send FormData directly, no JSON.stringify
+        body: formData,
+       
+      
+       
+        // Send FormData directly, no JSON.stringify
       });
   
       if (!response.ok) {

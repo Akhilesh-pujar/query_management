@@ -4,7 +4,7 @@ from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import generics,permissions
-
+from django.contrib.auth.hashers import check_password
 from rest_framework.permissions import IsAuthenticated
 from .utils import generate_otp, send_email_otp, send_phone_otp
 from django.utils.timezone import now, timedelta
@@ -18,7 +18,7 @@ from django.core.exceptions import ValidationError
 from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.utils import timezone
-current_time = timezone.now()
+
 
 
 from .serializers import QuerySerializer,QueryAssignSerializer
@@ -80,7 +80,7 @@ class SignupInitView(APIView):
             # )
             
             # Prepare user data for caching (excluding sensitive information)
-            user_data = {k: v for k, v in serializer.validated_data.items() if k != 'password'}
+            user_data = serializer.validated_data.copy()
             
             # Store user details in cache with session ID
             cache.set(f'signup_session_{session_id}', {
@@ -155,20 +155,28 @@ class VerifyEmailOTPView(APIView):
 
         try:
             # Extract password if present (and remove from user_data)
-            password = user_data.pop('password', None)
+            password = user_data.get('password')
+
+            if not password:
+                return Response({
+                    'error': 'Password is missing',
+                    'details': 'Password must be provided during signup'
+                }, status=status.HTTP_400_BAD_REQUEST)
 
             # Create user
             # Assuming your User model has these fields
             user = User.objects.create_user(
                 email=user_data.get('email'),
                 user_type=user_data.get('user_type'),
-                password= user_data.get('password',user_data.get('password')),
                 contact_number= user_data.get('cotact_number',user_data.get('contact_number')),
                 first_name= user_data.get('first_name',user_data.get('first_name')),
                 last_name= user_data.get('last_name',user_data.get('last_name')),
+                password= user_data.get('password',user_data.get('password')),
                 
                   # This will add any additional fields
             )
+            user.set_password(password)  # Hash the password
+            user.save()
 
             # Clear the cache after successful verification
             cache.delete(cache_key)
@@ -202,6 +210,9 @@ class LoginView(APIView):
 
             if user is None:
                 return Response({"error": "invalid creds"}, status=status.HTTP_401_UNAUTHORIZED)
+            
+            if not check_password(password, user.password):
+                return Response({"error": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
 
             if not user.is_active:
                 return Response({"error": "User account is disabled"}, status=status.HTTP_403_FORBIDDEN)
@@ -211,10 +222,11 @@ class LoginView(APIView):
 
             # Determine user type
             
-            if user and user.check_password(password):
-              refresh = RefreshToken.for_user(user)
+          
+            refresh = RefreshToken.for_user(user)
+            
               #user_type = "customer" if hasattr(user, 'is_customer') and user.is_customer else "internal"
-              return Response({
+            return Response({
                 "message": "Login successful",
                 "userType": user.user_type,
                 "email": user.email,
@@ -222,52 +234,25 @@ class LoginView(APIView):
                 "refreshToken": str(refresh),
             }, status=status.HTTP_200_OK)          
             
-        
-        
+
 
         except Exception as e:
             return Response({"error": "An unexpected error occurred", "details": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR) 
 # 1. Create a query
-from rest_framework import status
-from rest_framework.response import Response
-from rest_framework.views import APIView
-from .models import User, Query, Department
-from .serializers import QuerySerializer
-import logging
-
-logger = logging.getLogger(__name__)
-
-from rest_framework import status
-from rest_framework.response import Response
-from rest_framework.views import APIView
-from .models import User, Query, Department
-from .serializers import QuerySerializer
-import logging
-
-logger = logging.getLogger(__name__)
-
-from django.utils import timezone
-from rest_framework import status
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from .models import User, Department, Query
-from .serializers import QuerySerializer
-import logging
 
 logger = logging.getLogger(__name__)
 
 class RaiseQueryView(APIView):
     def post(self, request):
-        # Extract email from the request
+        # Extract email from the request headers
         email = request.data.get('email')
-        
         if not email:
             return Response({
                 'error': 'Missing email',
-                'details': 'Email is required to create a query'
+                'details': 'Email is required in the headers to create a query'
             }, status=status.HTTP_400_BAD_REQUEST)
 
-        # Fetch the user by email
+        # Check if the email corresponds to a valid user
         try:
             user = User.objects.get(email=email)
         except User.DoesNotExist:
@@ -278,13 +263,13 @@ class RaiseQueryView(APIView):
 
         # Extract required query fields
         query_data = {
-            "queryNumber": request.data.get("queryNumber"),
-            "priority": request.data.get("priority"),
             "title": request.data.get("title"),
             "subject": request.data.get("subject"),
-            "queryTo": request.data.get("queryTo"),
+            "query_to": request.data.get("queryTo"),
+            "priority": request.data.get("priority"),
             "description": request.data.get("description"),
             "attachment": request.data.get("attachment"),
+            "created_by": user.pk  # Use the user's primary key (pk) instead of email
         }
 
         # Check for missing fields
@@ -295,33 +280,27 @@ class RaiseQueryView(APIView):
                 "details": f"The following fields are required: {', '.join(missing_fields)}"
             }, status=status.HTTP_400_BAD_REQUEST)
 
-        # Fetch the Department instance based on the queryTo value (assuming queryTo is the department name)
+        # Fetch the Department instance based on the queryTo value
         try:
-            department = Department.objects.get(name=query_data["queryTo"])
+            department = Department.objects.get(name=query_data["query_to"])
         except Department.DoesNotExist:
             return Response({
                 "error": "Invalid department",
-                "details": f"Department '{query_data['queryTo']}' does not exist"
+                "details": f"Department '{query_data['query_to']}' does not exist"
             }, status=status.HTTP_400_BAD_REQUEST)
 
-        # Prepare the data for the serializer
-        query_data["created_by"] = user.id
+        # Update query data with department instance
         query_data["query_to"] = department
-
-        # Ensure timezone-aware datetime for created_at
-        query_data["created_at"] = current_time  # Correct method to get current time
 
         # Use the QuerySerializer to validate and save the query
         serializer = QuerySerializer(data=query_data)
-
         if serializer.is_valid():
             try:
-                query = serializer.save()  # This will save the Query instance and return it
+                query = serializer.save()  # Save the Query instance
                 return Response({
                     "message": "Query created successfully",
-                    "query_number": query.query_number,  # Use query_number instead of id
+                    "query_number": query.query_number,  # Automatically generated in the model
                     "title": query.title,
-                    "queryNumber": query.query_number,
                     "priority": query.priority
                 }, status=status.HTTP_201_CREATED)
             except Exception as e:
@@ -330,7 +309,8 @@ class RaiseQueryView(APIView):
                     'error': 'An unexpected error occurred during query creation',
                     'details': str(e)
                 }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        
+
+        # Handle serializer errors
         return Response({
             'error': 'Invalid query data',
             'details': serializer.errors
