@@ -30,7 +30,7 @@ class CustomUserAdmin(UserAdmin):
 class AssetNameAdmin(admin.ModelAdmin):
     list_display = (
         "query_number",
-        "user",
+       
         "title",
         "subject",
         "query_to",
@@ -44,7 +44,7 @@ class AssetNameAdmin(admin.ModelAdmin):
         "updated_at",
     )
     search_fields = ("QueryNumber",)
-    list_filter = ("user",)
+    list_filter = ("title",)
 
 @admin.register(QueryHistory)
 class AssetNameAdmin(admin.ModelAdmin):

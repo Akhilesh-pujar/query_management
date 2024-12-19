@@ -78,7 +78,7 @@ const Query = () => {
   const [selectedQuery, setSelectedQuery] = useState<QueryInterface | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [formData, setFormData] = useState<UpdateQueryPayload>({
-    assignedTo: '',
+    assignedTo: 'please enter staff email id',
     status: 'open',
     queryTo: '',
   })
@@ -142,16 +142,18 @@ const Query = () => {
     try {
       setUpdating(true)
       
+      
       const token = localStorage.getItem('token') // Fallback to AuthContext if token is mis
        if(!token) {
         throw new Error('Token not found, please login again')
       }
       const response = await fetch('http://127.0.0.1:8000/api/queries/update/', {
-        method: 'POST',
+        method: 'PATCH',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
+          "Content-Type": "application/json",
+          "Authorization": token,// Replace <your-token> with the actual token
+         },
+       
         body: JSON.stringify({
           ...formData,
         queryNumber: selectedQuery.queryNumber

@@ -18,7 +18,7 @@ from django.core.exceptions import ValidationError
 from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.utils import timezone
-
+import random
 
 
 from .serializers import QuerySerializer,QueryAssignSerializer
@@ -244,78 +244,82 @@ logger = logging.getLogger(__name__)
 
 class RaiseQueryView(APIView):
     def post(self, request):
-        # Extract email from the request headers
-        email = request.data.get('email')
-        if not email:
-            return Response({
-                'error': 'Missing email',
-                'details': 'Email is required in the headers to create a query'
-            }, status=status.HTTP_400_BAD_REQUEST)
-
-        # Check if the email corresponds to a valid user
         try:
-            user = User.objects.get(email=email)
-        except User.DoesNotExist:
-            return Response({
-                'error': 'User not found',
-                'details': 'No user found with the provided email'
-            }, status=status.HTTP_404_NOT_FOUND)
+            # Extract email from the request data
+            email = request.data.get('email')
+            if not email:
+                return Response({
+                    'error': 'Missing email',
+                    'details': 'Email is required to create a query'
+                }, status=status.HTTP_400_BAD_REQUEST)
 
-        # Extract required query fields
-        query_data = {
-            "title": request.data.get("title"),
-            "subject": request.data.get("subject"),
-            "query_to": request.data.get("queryTo"),
-            "priority": request.data.get("priority"),
-            "description": request.data.get("description"),
-            "attachment": request.data.get("attachment"),
-            "created_by": user.pk  # Use the user's primary key (pk) instead of email
-        }
-
-        # Check for missing fields
-        missing_fields = [key for key, value in query_data.items() if not value]
-        if missing_fields:
-            return Response({
-                "error": "Missing query data",
-                "details": f"The following fields are required: {', '.join(missing_fields)}"
-            }, status=status.HTTP_400_BAD_REQUEST)
-
-        # Fetch the Department instance based on the queryTo value
-        try:
-            department = Department.objects.get(name=query_data["query_to"])
-        except Department.DoesNotExist:
-            return Response({
-                "error": "Invalid department",
-                "details": f"Department '{query_data['query_to']}' does not exist"
-            }, status=status.HTTP_400_BAD_REQUEST)
-
-        # Update query data with department instance
-        query_data["query_to"] = department
-
-        # Use the QuerySerializer to validate and save the query
-        serializer = QuerySerializer(data=query_data)
-        if serializer.is_valid():
+            # Check if the email corresponds to a valid user
             try:
-                query = serializer.save()  # Save the Query instance
+                user = User.objects.get(email=email)
+            except User.DoesNotExist:
                 return Response({
-                    "message": "Query created successfully",
-                    "query_number": query.query_number,  # Automatically generated in the model
-                    "title": query.title,
-                    "priority": query.priority
-                }, status=status.HTTP_201_CREATED)
-            except Exception as e:
-                logger.error(f"Query creation error: {str(e)}")
+                    'error': 'User not found',
+                    'details': 'No user found with the provided email'
+                }, status=status.HTTP_404_NOT_FOUND)
+
+            # Extract query number and validate its presence
+            query_number = request.data.get('queryNumber')
+            if not query_number:
                 return Response({
-                    'error': 'An unexpected error occurred during query creation',
-                    'details': str(e)
-                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                    'error': 'Missing query number',
+                    'details': 'Query number is required'
+                }, status=status.HTTP_400_BAD_REQUEST)
 
-        # Handle serializer errors
-        return Response({
-            'error': 'Invalid query data',
-            'details': serializer.errors
-        }, status=status.HTTP_400_BAD_REQUEST)
+            # Get department
+            department_name = request.data.get('queryTo')
+            try:
+                department = Department.objects.get(name=department_name)
+            except Department.DoesNotExist:
+                return Response({
+                    'error': 'Invalid department',
+                    'details': f"Department '{department_name}' does not exist"
+                }, status=status.HTTP_400_BAD_REQUEST)
 
+            # Prepare query data
+            query_data = {
+                'query_number': query_number,
+                'title': request.data.get('title'),
+                'subject': request.data.get('subject'),
+                'query_to': department.id,  # Use department ID instead of name
+                'priority': request.data.get('priority', 'Low'),
+                'description': request.data.get('description'),
+                'status': request.data.get('status', 'Pending'),
+                'created_by': user.id
+            }
+
+            # Handle attachment if present
+            if 'attachment' in request.FILES:
+                query_data['attachment'] = request.FILES['attachment']
+
+            # Create and validate the query
+            serializer = QuerySerializer(data=query_data)
+            if not serializer.is_valid():
+                return Response({
+                    'error': 'Invalid query data',
+                    'details': serializer.errors
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            # Save the query
+            query = serializer.save()
+
+            return Response({
+                'message': 'Query created successfully',
+                'query_number': query.query_number,
+                'title': query.title,
+                'priority': query.priority,
+                'status': query.status,
+            }, status=status.HTTP_201_CREATED)
+
+        except Exception as e:
+            return Response({
+                'error': 'An unexpected error occurred during query creation',
+                'details': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 # 2. Get query list
 class QueryListView(APIView):
       def post(self, request):
@@ -471,45 +475,64 @@ class UpdateQueryView(generics.UpdateAPIView):
     View to update query details (accessible only by internal users).
     """
     serializer_class = QuerySerializer
-    permission_classes = [IsAuthenticated, IsInternalUser]  # Ensure user is authenticated and internal
     queryset = Query.objects.all()
 
     def update(self, request, *args, **kwargs):
-        # Step 1: Check if the 'Authorization' token is present in the headers
-        # auth_header = request.headers.get('Authorization')
-        
-        # if not auth_header:
-        #     return Response({"error": "Authorization token is missing"}, status=status.HTTP_401_UNAUTHORIZED)
+        query_number = request.data.get('queryNumber')
+        assigned_to_email = request.data.get("assignedTo")
+        querystatus = request.data.get("status")
+        query_data = request.data.get("queryTo")
 
-        # Step 2: Extract the 'query_number' from request headers
-        query_number = request.headers.get('query_number')
-        
         if not query_number:
-            return Response({"error": "Query number is missing from the request header"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"error": "Query number is missing from the request header"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
+        if not assigned_to_email:
+            return Response(
+                {"error": "Assigned user email is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Ensure the assigned user is a staff member
+        staff_user = User.objects.filter(email=assigned_to_email, is_staff=True).first()
+        if not staff_user:
+            return Response(
+                {"error": "Assigned user must be a staff member."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Attempt to fetch the query instance
+        instance = Query.objects.filter(query_number=query_number).first()
+        if not instance:
+            return Response(
+                {"error": "Query with the specified query number does not exist"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Check if query_data is a string (assuming it represents department name)
+        if isinstance(query_data, str):
+            try:
+                department = Department.objects.get(name=query_data)
+            except Department.DoesNotExist:
+                return Response({
+                    "error": "Invalid department",
+                    "details": f"Department '{query_data}' does not exist"
+                }, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            return Response({
+                "error": "Invalid 'queryTo' format. Expected a string."
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Update the query instance with the validated data
         try:
-            # Step 3: Fetch the Query object using the 'query_number'
-            instance = Query.objects.filter(query_number=query_number).first()
+            instance.assigned_to = staff_user
+            instance.status = querystatus
+            instance.query_to = department
+            instance.save()
 
-            if not instance:
-                return Response({"error": "Query with the specified query_number does not exist"}, status=status.HTTP_404_NOT_FOUND)
-
-            # Step 4: Check for necessary fields in the request body
-            required_fields = ['assigned_to', 'status', 'query_to']
-            for field in required_fields:
-                if field not in request.data:
-                    return Response(
-                        {"error": f"'{field}' is required in the request body"},
-                        status=status.HTTP_400_BAD_REQUEST
-                    )
-
-            # Step 5: Determine if the update should be partial (i.e., only update fields that are present in the request)
-            partial = kwargs.pop('partial', False)
-            serializer = self.get_serializer(instance, data=request.data, partial=partial)
-            serializer.is_valid(raise_exception=True)
-
-            # Step 6: Perform the update
-            self.perform_update(serializer)
+            serializer = QuerySerializer(instance)
 
             return Response(
                 {"message": "Query updated successfully", "data": serializer.data},
@@ -517,7 +540,10 @@ class UpdateQueryView(generics.UpdateAPIView):
             )
 
         except Exception as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"error": f"An error occurred: {str(e)}"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 class AssignQueryView(generics.UpdateAPIView):
     """
     View to assign a query to a specific department (accessible only by internal users).

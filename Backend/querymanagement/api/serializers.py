@@ -65,40 +65,45 @@ class DepartmentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Department
         fields = [ 'name']
-
 class QuerySerializer(serializers.ModelSerializer):
-    query_to_choices = serializers.SerializerMethodField()
-    created_at = serializers.DateTimeField(read_only=True)  # Use DateTimeField
+    query_to = serializers.PrimaryKeyRelatedField(queryset=Department.objects.all())
+    
     class Meta:
         model = Query
         fields = [
-           'query_number', 
-            'title', 
-            'subject', 
-            'query_to_choices',
-            'priority', 
-            'description', 
-            'attachment', 
-            'status', 
-            'created_by', 
-            'assigned_to', 
-            'created_at', 
+            'query_number',
+            'title',
+            'subject',
+            'query_to',
+            'priority',
+            'description',
+            'attachment',
+            'status',
+            'created_by',
+            'assigned_to',
+            'created_at',
             'updated_at'
         ]
-        read_only_fields = ['query_number', 'created_at','updated_at']
+        read_only_fields = ['created_at', 'updated_at']
 
-    def get_query_to_choices(self, value):
-        # Fetch departments for dropdown
-         try:
-            department = Department.objects.get(name=value.query_to)
-            return department.name
-         except Department.DoesNotExist:
-            raise serializers.ValidationError("Invalid department name")
-         
-    def create(self, get_query_to_choices):
-        """Override create method to handle the creation of the Query model."""
-        query = Query.objects.create(**get_query_to_choices)
-        return query
+    def validate_query_number(self, value):
+        if not value:
+            raise serializers.ValidationError("Query number is required")
+        if Query.objects.filter(query_number=value).exists():
+            raise serializers.ValidationError("Query number already exists")
+        return value
+
+    def create(self, validated_data):
+        """Override create method to properly create the Query instance."""
+        return Query.objects.create(**validated_data)
+
+    def to_representation(self, instance):
+        """Customize the output representation"""
+        data = super().to_representation(instance)
+        if instance.query_to:
+            data['query_to'] = instance.query_to.name
+        return data
+
 
 class QueryHistorySerializer(serializers.ModelSerializer):
     class Meta:

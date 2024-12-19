@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Button } from "@/components/ui/button"
+import { Button } from "@/components/ui/button";
 
 import {
   Table,
@@ -9,11 +9,9 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table"
+} from "@/components/ui/table";
 import { useAuth } from '../hooks/useAuth';
-// import { useRecoilValue } from 'recoil';
-// import { authAtom } from '../recoil/authAtom';
-import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { QueryForm } from './QueryForm';
 import { z } from 'zod';
 
@@ -27,6 +25,7 @@ export const querySchema = z.object({
 
 export type Query = z.infer<typeof querySchema> & {
   queryNumber: string;
+  status: string; // Added the 'status' field
   attachment?: File;
 };
 
@@ -34,7 +33,6 @@ export const CustomerPage: React.FC = () => {
   const [queries, setQueries] = useState<Query[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const { token } = useAuth();
-  
 
   useEffect(() => {
     const fetchQueries = async () => {
@@ -58,7 +56,18 @@ export const CustomerPage: React.FC = () => {
         }
 
         const data = await response.json();
-        setQueries(data);
+
+        // Ensure data mapping includes 'status'
+        const mappedQueries: Query[] = data.map((item: any) => ({
+          queryNumber: item.query_number,
+          title: item.title,
+          subject: item.subject,
+          queryTo: item.query_to,
+          priority: item.priority,
+          status: item.status, // Map 'status' field
+        }));
+
+        setQueries(mappedQueries);
       } catch (error) {
         console.error('Error fetching queries:', error);
       }
@@ -93,6 +102,7 @@ export const CustomerPage: React.FC = () => {
             <TableHead>Subject</TableHead>
             <TableHead>Query To</TableHead>
             <TableHead>Priority</TableHead>
+            <TableHead>Status</TableHead> {/* Added Status column */}
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -103,6 +113,7 @@ export const CustomerPage: React.FC = () => {
               <TableCell>{query.subject}</TableCell>
               <TableCell>{query.queryTo}</TableCell>
               <TableCell>{query.priority}</TableCell>
+              <TableCell>{query.status}</TableCell> {/* Added Status value */}
             </TableRow>
           ))}
         </TableBody>
@@ -110,4 +121,3 @@ export const CustomerPage: React.FC = () => {
     </div>
   );
 };
-

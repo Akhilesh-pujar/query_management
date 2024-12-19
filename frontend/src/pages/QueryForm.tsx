@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -9,7 +9,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-
 import { useForm } from 'react-hook-form';
 
 interface QueryFormData {
@@ -19,8 +18,7 @@ interface QueryFormData {
   queryTo: string;
   priority: "Low" | "Medium" | "High";
   description: string;
-  status: "pending" | "in-progress";
-  
+  status: "Pending" | "In Progress";
   attachment?: File | undefined;
 }
 
@@ -38,20 +36,20 @@ function generateQueryNumber(): string {
 export const QueryForm: React.FC<QueryFormProps> = ({ onSubmit }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
+  const [currentQueryNumber, setCurrentQueryNumber] = useState('');
 
   const { register, handleSubmit, setValue, watch, formState: { errors } } = useForm<QueryFormData>({
     defaultValues: {
-      queryNumber: generateQueryNumber(),
-      priority: "Low",
-      status: "pending",
-    },
+      status: "Pending",
+      priority: "Low"
+    }
   });
 
-  
-   
-    
-
+  useEffect(() => {
+    const newQueryNumber = generateQueryNumber();
+    setCurrentQueryNumber(newQueryNumber);
+    setValue('queryNumber', newQueryNumber);
+  }, [setValue]);
 
   const validateForm = (data: QueryFormData): string | null => {
     if (!data.title || data.title.length < 3) return "Title must be at least 3 characters long.";
@@ -62,6 +60,11 @@ export const QueryForm: React.FC<QueryFormProps> = ({ onSubmit }) => {
   };
  
   const onSubmitForm = async (data: QueryFormData) => {
+    if (!currentQueryNumber) {
+      setError("Query number not generated. Please try again.");
+      return;
+    }
+
     const validationError = validateForm(data);
     if (validationError) {
       setError(validationError);
@@ -70,40 +73,47 @@ export const QueryForm: React.FC<QueryFormProps> = ({ onSubmit }) => {
   
     setIsSubmitting(true);
     setError(null);
-  
-    const formData = new FormData();
-  Object.entries(data).forEach(([key, value]) => {
-    if (key === "attachment" && value instanceof FileList && value.length > 0) {
-      formData.append(key, value[0]); // Handle file uploads
-    } else {
-      formData.append(key, value as string);
-    }
-  });
 
-  // Add email to the form data
-  const cachedEmail = localStorage.getItem("email");
-  if (cachedEmail) {
-    formData.append("email", cachedEmail); // Add the email to the form data
-  }
+    // Create FormData matching exact payload structure
+    const formData = new FormData();
+    formData.append('queryNumber', currentQueryNumber);
+    formData.append('priority', data.priority);
+    formData.append('status', data.status);
+    formData.append('title', data.title);
+    formData.append('subject', data.subject);
+    formData.append('description', data.description);
+    formData.append('queryTo', data.queryTo);
+    
+    // Add attachment if exists
+    if (data.attachment instanceof FileList && data.attachment.length > 0) {
+      formData.append('attachment', data.attachment[0]);
+    }
+
+    // Add email from localStorage
+    const cachedEmail = localStorage.getItem("email");
+    if (cachedEmail) {
+      formData.append('email', cachedEmail);
+    }
 
     try {
-      const cachedEmail = localStorage.getItem("email")|| "akhileshpujar796@gmail.com";
-      console.log(cachedEmail)
+      // Log form data for debugging
+      console.log('Submitting form data:');
+      formData.forEach((value, key) => {
+        console.log(`${key}: ${value}`);
+      });
+
       const response = await fetch("http://127.0.0.1:8000/api/queries/create/", {
         method: "POST",
         body: formData,
-       
-      
-       
-        // Send FormData directly, no JSON.stringify
       });
-  
+
       if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || "Failed to submit query");
+        const errorData = await response.json();
+        throw new Error(errorData.details || "Failed to submit query");
       }
-  
+
       const result = await response.json();
+      console.log('Submit success:', result);
       onSubmit(result);
     } catch (error) {
       console.error("Error submitting query:", error);
@@ -120,6 +130,13 @@ export const QueryForm: React.FC<QueryFormProps> = ({ onSubmit }) => {
           {error}
         </div>
       )}
+
+      {/* Hidden query number field */}
+      <input 
+        type="hidden" 
+        {...register("queryNumber")} 
+        value={currentQueryNumber} 
+      />
 
       <Input
         {...register("title")}
@@ -141,23 +158,23 @@ export const QueryForm: React.FC<QueryFormProps> = ({ onSubmit }) => {
           <SelectValue placeholder="Select Department" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="ITSUPPORT">IT Support</SelectItem>
-          <SelectItem value="IT_TEAM">IT</SelectItem>
+          <SelectItem value="IT SUPPORT">IT Support</SelectItem>
+          <SelectItem value="IT TEAM">IT</SelectItem>
           <SelectItem value="HARDWARE SUPPORT">Hardware Support</SelectItem>
         </SelectContent>
       </Select>
       {errors.queryTo && <p className="text-red-500">Please select a department</p>}
 
       <Select
-        onValueChange={(value) => setValue("status", value as "pending" | "in-progress")}
+        onValueChange={(value) => setValue("status", value as "Pending" | "In Progress")}
         value={watch("status")}
       >
         <SelectTrigger>
           <SelectValue placeholder="Select Status" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="pending">Pending</SelectItem>
-          <SelectItem value="in-progress">In Progress</SelectItem>
+          <SelectItem value="Pending">Pending</SelectItem>
+          <SelectItem value="In Progress">In Progress</SelectItem>
         </SelectContent>
       </Select>
 

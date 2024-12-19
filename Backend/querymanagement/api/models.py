@@ -117,71 +117,62 @@ class Department(models.Model):
 
 class Query(models.Model):
     PRIORITY_CHOICES = (
-        ("Low", "Low"), 
-        ("Medium", "Medium"), 
+        ("Low", "Low"),
+        ("Medium", "Medium"),
         ("High", "High")
     )
     
     STATUS_CHOICES = [
-        ("Pending", "Pending"), 
+        ("Pending", "Pending"),
         ("Resolved", "Resolved"),
         ("In Progress", "In Progress"),
         ("Closed", "Closed")
     ]
     
-    query_number = models.CharField(max_length=50, primary_key=True, unique=True)
-    user = models.ForeignKey(
-        User, 
-        on_delete=models.CASCADE, 
-        related_name='customer_queries',
-        null=True,  # Allow null to handle potential user deletion scenarios
-        blank=True
+    query_number = models.CharField(
+        max_length=50,
+        primary_key=True,
+        unique=True,
+        blank=False,  # Ensure it's not blank
+        null=False   # Ensure it's not null
     )
     title = models.CharField(max_length=255)
     subject = models.CharField(max_length=255)
     query_to = models.ForeignKey(
-        Department, 
-        on_delete=models.SET_NULL, 
-        null=True, 
-        blank=True, 
+        Department,
+        on_delete=models.SET_NULL,
+        null=True,
         related_name="queries"
     )
     priority = models.CharField(max_length=10, choices=PRIORITY_CHOICES, default="Low")
     description = models.TextField()
     attachment = models.FileField(upload_to="attachments/", null=True, blank=True)
     status = models.CharField(
-        max_length=20, 
-        choices=STATUS_CHOICES, 
+        max_length=20,
+        choices=STATUS_CHOICES,
         default="Pending"
     )
     created_by = models.ForeignKey(
-        User, 
-        on_delete=models.SET_NULL, 
-        null=True, 
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
         related_name="created_queries"
     )
     assigned_to = models.ForeignKey(
-        User, 
-        on_delete=models.SET_NULL, 
-        null=True, 
-        blank=True, 
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
         related_name="assigned_queries"
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
-    def save(self, *args, **kwargs):
-        # Generate query number if not provided
-        # if not self.query_number:
-        #     from django.utils.crypto import get_random_string
-        #     timestamp = self.created_at.strftime('%Y%m%d') if self.created_at else timezone.now().strftime('%Y%m%d')
-        #     random_suffix = get_random_string(length=6, allowed_chars='0123456789')
-        #     self.query_number = f'QRY-{timestamp}-{random_suffix}'
-        
-        super().save(*args, **kwargs)
-
     def __str__(self):
         return f"{self.title} - {self.query_number}"
+
+    class Meta:
+        ordering = ['-created_at']
 
 class QueryHistory(models.Model):
     query = models.ForeignKey(Query, on_delete=models.CASCADE, related_name="history")
