@@ -78,7 +78,7 @@ const Query = () => {
   const [selectedQuery, setSelectedQuery] = useState<QueryInterface | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [formData, setFormData] = useState<UpdateQueryPayload>({
-    assignedTo: 'please enter staff email id',
+    assignedTo: 'enter staff mail ',
     status: 'open',
     queryTo: '',
   })
@@ -142,17 +142,12 @@ const Query = () => {
     try {
       setUpdating(true)
       
-      
-      const token = localStorage.getItem('token') // Fallback to AuthContext if token is mis
-       if(!token) {
-        throw new Error('Token not found, please login again')
-      }
       const response = await fetch('http://127.0.0.1:8000/api/queries/update/', {
         method: 'PATCH',
         headers: {
-          "Content-Type": "application/json",
-          "Authorization": token,// Replace <your-token> with the actual token
-         },
+          'Content-Type': 'application/json',
+           // Include the token if required
+        },
        
         body: JSON.stringify({
           ...formData,
@@ -173,7 +168,7 @@ const Query = () => {
             : q
         )
       )
-
+        fetchQueries();
       toast({
         title: "Success",
         description: "Query updated successfully",
@@ -242,83 +237,85 @@ const Query = () => {
             <TableCell>{query.resolutionDate || 'N/A'}</TableCell>
             <TableCell>{query.status}</TableCell>
             <TableCell>
-              <Dialog open={dialogOpen && selectedQuery?.serialNumber === query.serialNumber} 
-                     onOpenChange={(open) => {
-                       setDialogOpen(open)
-                       if (open) {
-                         setSelectedQuery(query)
-                       } else {
-                         setSelectedQuery(null)
-                       }
-                     }}>
-                <DialogTrigger asChild>
-                  <Button variant="outline">Manage</Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Manage Query: {query.queryNumber}</DialogTitle>
-                  </DialogHeader>
-                  <div className="grid gap-4 py-4">
-                    <div className="grid grid-cols-4 items-center gap-4">
-                      <label htmlFor="queryTo">Query To:</label>
-                      <Select
-                        onValueChange={(value) => setFormData(prev => ({ ...prev, queryTo: value }))}
-                        value={formData.queryTo}
-                      >
-                        <SelectTrigger className="col-span-3">
-                          <SelectValue placeholder="Select department" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Sales Department">Sales Department</SelectItem>
-                          <SelectItem value="IT Support">IT Support</SelectItem>
-                          <SelectItem value="Customer Service">Customer Service</SelectItem>
-                          <SelectItem value="Technical Team">Technical Team</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="grid grid-cols-4 items-center gap-4">
-                      <label htmlFor="assignTo">Assign to:</label>
-                      <Input
-                        id="assignTo"
-                        value={formData.assignedTo}
-                        className="col-span-3"
-                        onChange={(e) => setFormData(prev => ({ ...prev, assignedTo: e.target.value }))}
-                      />
-                    </div>
-                    <div className="grid grid-cols-4 items-center gap-4">
-                      <label htmlFor="status">Status:</label>
-                      <Select
-                        onValueChange={(value) => setFormData(prev => ({ ...prev, status: value as Status }))}
-                        value={formData.status}
-                      >
-                        <SelectTrigger className="col-span-3">
-                          <SelectValue placeholder="Select status" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="open">Open</SelectItem>
-                          <SelectItem value="in-progress">In Progress</SelectItem>
-                          <SelectItem value="resolved">Resolved</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  <DialogFooter>
-                    <Button 
-                      variant="outline" 
-                      onClick={() => setDialogOpen(false)}
-                    >
-                      Cancel
-                    </Button>
-                    <Button 
-                      onClick={handleSubmit}
-                      disabled={updating}
-                    >
-                      {updating ? 'Updating...' : 'Submit'}
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
-            </TableCell>
+  <Dialog
+    open={dialogOpen && selectedQuery?.queryNumber === query.queryNumber}
+    onOpenChange={(open) => {
+      setDialogOpen(open)
+      if (open) {
+        setSelectedQuery(query) // Set the specific query
+        setFormData({
+          assignedTo: query.assignedTo || 'please enter staff email id',
+          status: query.status,
+          queryTo: query.queryTo,
+        }) // Initialize form data with current query details
+      } else {
+        setSelectedQuery(null)
+      }
+    }}
+  >
+    <DialogTrigger asChild>
+      <Button variant="outline">Manage</Button>
+    </DialogTrigger>
+    <DialogContent>
+      <DialogHeader>
+        <DialogTitle>Manage Query: {selectedQuery?.queryNumber || query.queryNumber}</DialogTitle>
+      </DialogHeader>
+      <div className="grid gap-4 py-4">
+        <div className="grid grid-cols-4 items-center gap-4">
+          <label htmlFor="queryTo">Query To:</label>
+          <Select
+            onValueChange={(value) => setFormData((prev) => ({ ...prev, queryTo: value }))}
+            value={formData.queryTo}
+          >
+            <SelectTrigger className="col-span-3">
+              <SelectValue placeholder="Select department" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Sales Department">Sales Department</SelectItem>
+              <SelectItem value="IT SUPPORT">IT Support</SelectItem>
+              <SelectItem value="Customer Service">Customer Service</SelectItem>
+              <SelectItem value="Technical Team">Technical Team</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="grid grid-cols-4 items-center gap-4">
+          <label htmlFor="assignTo">Assign to:</label>
+          <Input
+            id="assignTo"
+            value={formData.assignedTo}
+            className="col-span-3"
+            onChange={(e) => setFormData((prev) => ({ ...prev, assignedTo: e.target.value }))}
+          />
+        </div>
+        <div className="grid grid-cols-4 items-center gap-4">
+          <label htmlFor="status">Status:</label>
+          <Select
+            onValueChange={(value) => setFormData((prev) => ({ ...prev, status: value as Status }))}
+            value={formData.status}
+          >
+            <SelectTrigger className="col-span-3">
+              <SelectValue placeholder="Select status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="open">Open</SelectItem>
+              <SelectItem value="in-progress">In Progress</SelectItem>
+              <SelectItem value="resolved">Resolved</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+      <DialogFooter>
+        <Button variant="outline" onClick={() => setDialogOpen(false)}>
+          Cancel
+        </Button>
+        <Button onClick={handleSubmit} disabled={updating}>
+          {updating ? 'Updating...' : 'Submit'}
+        </Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
+</TableCell>
+
           </TableRow>
         ))}
       </TableBody>

@@ -410,66 +410,6 @@ class InternalQueryView(APIView):
           
       
 
-
-# def patch(self, request, query_id):
-#         # Extract email from request body
-#         email = request.data.get('email')
-#         if not email:
-#             return Response({
-#                 'error': 'Missing email',
-#                 'details': 'Email is required in the request body'
-#             }, status=status.HTTP_400_BAD_REQUEST)
-
-#         # Fetch the user by email
-#         try:
-#             user = User.objects.get(email=email)
-
-#             # Check if the user is internal
-#             if not user.is_staff:
-#                 return Response({
-#                     'error': 'Permission denied',
-#                     'details': 'Only internal users can edit query statuses'
-#                 }, status=status.HTTP_403_FORBIDDEN)
-
-#         except User.DoesNotExist:
-#             return Response({
-#                 'error': 'User not found',
-#                 'details': 'No user associated with the provided email'
-#             }, status=status.HTTP_404_NOT_FOUND)
-
-#         # Retrieve query to update
-#         try:
-#             query = Query.objects.get(id=query_id)
-#         except Query.DoesNotExist:
-#             return Response({
-#                 'error': 'Query not found',
-#                 'details': 'No query found with the provided ID'
-#             }, status=status.HTTP_404_NOT_FOUND)
-
-#         # Update query status
-#         try:
-#             new_status = request.data.get('status')
-#             if not new_status:
-#                 return Response({
-#                     'error': 'Missing status',
-#                     'details': 'Status is required to update the query'
-#                 }, status=status.HTTP_400_BAD_REQUEST)
-
-#             query.status = new_status
-#             query.save()
-
-#             return Response({
-#                 'message': 'Query status updated successfully',
-#                 'query_id': query.id,
-#                 'new_status': query.status
-#             }, status=status.HTTP_200_OK)
-
-#         except Exception as e:
-#             logger.error(f"Error updating query status: {str(e)}")
-#             return Response({
-#                 'error': 'An error occurred while updating query status',
-#                 'details': str(e)
-#             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 class UpdateQueryView(generics.UpdateAPIView):
     """
     View to update query details (accessible only by internal users).
@@ -496,7 +436,7 @@ class UpdateQueryView(generics.UpdateAPIView):
             )
 
         # Ensure the assigned user is a staff member
-        staff_user = User.objects.filter(email=assigned_to_email, is_staff=True).first()
+        staff_user = User.objects.filter(email=assigned_to_email, user_type="Internal").first()
         if not staff_user:
             return Response(
                 {"error": "Assigned user must be a staff member."},
@@ -511,7 +451,7 @@ class UpdateQueryView(generics.UpdateAPIView):
                 status=status.HTTP_404_NOT_FOUND
             )
         
-        # Check if query_data is a string (assuming it represents department name)
+        # Check if query_data is a string
         if isinstance(query_data, str):
             try:
                 department = Department.objects.get(name=query_data)
@@ -533,6 +473,7 @@ class UpdateQueryView(generics.UpdateAPIView):
             instance.save()
 
             serializer = QuerySerializer(instance)
+            
 
             return Response(
                 {"message": "Query updated successfully", "data": serializer.data},
@@ -544,67 +485,5 @@ class UpdateQueryView(generics.UpdateAPIView):
                 {"error": f"An error occurred: {str(e)}"},
                 status=status.HTTP_400_BAD_REQUEST
             )
-class AssignQueryView(generics.UpdateAPIView):
-    """
-    View to assign a query to a specific department (accessible only by internal users).
-    """
-    serializer_class = QueryAssignSerializer
-    permission_classes = [IsInternalUser]
-    queryset = Query.objects.all()
-
-    def update(self, request, *args, **kwargs):
-        try:
-            partial = kwargs.pop('partial', False)
-            instance = self.get_object()
-            serializer = self.get_serializer(instance, data=request.data, partial=partial)
-            serializer.is_valid(raise_exception=True)
-            self.perform_update(serializer)
-            return Response({"message": "Query assigned successfully", "data": serializer.data}, status=status.HTTP_200_OK)
-        except Exception as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-
-    def perform_update(self, serializer):
-        try:
-            serializer.save(assigned_at=timezone.now())
-        except Exception as e:
-            raise Exception(f"Failed to assign query: {str(e)}")
 
 
-class QueryByDepartmentView(APIView):
-    """
-    View to filter queries by department (accessible only by internal users).
-    """
-    permission_classes = [IsInternalUser]
-
-    def get(self, request, department):
-        try:
-            queries = Query.objects.filter(assigned_to_department=department)
-            if not queries.exists():
-                return Response({"message": "No queries found for this department"}, status=status.HTTP_404_NOT_FOUND)
-
-            serializer = QuerySerializer(queries, many=True)
-            return Response({"data": serializer.data}, status=status.HTTP_200_OK)
-        except Exception as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-        
-
-class ProtectedView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request):
-        return Response({"message": "You have access to this protected resource."})
-    
-
-class QueryToChoicesView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
-    
-    def get(self, request):
-        try:
-            departments = Department.objects.all()
-            choices = [
-                {'id': dept.id, 'name': dept.name} 
-                for dept in departments
-            ]
-            return Response(choices, status=status.HTTP_200_OK)
-        except Exception as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)

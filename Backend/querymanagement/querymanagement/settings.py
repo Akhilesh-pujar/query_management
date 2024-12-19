@@ -79,6 +79,8 @@ MIDDLEWARE.insert(0, 'corsheaders.middleware.CorsMiddleware')
 
 CORS_ORIGIN_ALLOW_ALL = True
 
+
+
 CORS_ALLOW_HEADERS = [
     'content-type',
     'X-User-Email',  # Add custom header for email
