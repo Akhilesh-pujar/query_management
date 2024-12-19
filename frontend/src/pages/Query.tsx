@@ -29,8 +29,6 @@ import {
 import { Toaster } from '@/components/ui/toaster'
 import { toast } from '@/hooks/use-toast'
 
-import { authAtom } from '@/recoil/authAtom'
-import { useRecoilValue } from 'recoil'
 
 export type Priority = 'Low' | 'Medium' | 'High'
 export type Status = 'open' | 'in-progress' | 'resolved'
@@ -137,58 +135,14 @@ const Query = () => {
     }
   }
 
-  const handleUpdate = async (query: QueryInterface, updates: Partial<UpdateQueryPayload>) => {
-    try {
-      setError(null)
-      const response = await fetch(`${API_URL}/api/queries/update/${query.serialNumber}/`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          assignedTo: updates.assignedTo ?? query.assignedTo ?? '',
-          status: updates.status ?? query.status,
-          queryTo: updates.queryTo ?? query.queryTo,
-        }),
-      })
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
-
-      const updatedData: APIQueryResponse = await response.json()
-      
-      setQueries(prevQueries => 
-        prevQueries.map(q =>
-          q.serialNumber === query.serialNumber
-            ? mapAPIResponseToQuery(updatedData)
-            : q
-        )
-      )
-
-      toast({
-        title: "Success",
-        description: "Query updated successfully",
-      })
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred'
-      setError(errorMessage)
-      toast({
-        variant: "destructive",
-        title: "Error updating query",
-        description: errorMessage,
-      })
-    }
-  }
-
-
+  
   const handleSubmit = async () => {
     if (!selectedQuery) return
 
     try {
       setUpdating(true)
-      const recoilState = useRecoilValue(authAtom);
-      const token = recoilState.token  // Fallback to AuthContext if token is mis
+      
+      const token = localStorage.getItem('token') // Fallback to AuthContext if token is mis
        if(!token) {
         throw new Error('Token not found, please login again')
       }

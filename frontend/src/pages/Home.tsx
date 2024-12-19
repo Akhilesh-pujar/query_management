@@ -12,13 +12,9 @@ const Home: React.FC = () => {
           <div className="flex items-center space-x-4">
             <Link to="/" className="flex items-center space-x-2">
               <Globe className="h-8 w-8 text-blue-500" />
-              <span className="font-bold text-xl">Atlassian</span>
+              <span className="font-bold text-xl">query_management</span>
             </Link>
-            <nav className="hidden md:flex items-center space-x-4">
-              <Link to="#" className="text-sm font-medium hover:text-blue-500 transition-colors">Products</Link>
-              <Link to="#" className="text-sm font-medium hover:text-blue-500 transition-colors">Solutions</Link>
-              <Link to="#" className="text-sm font-medium hover:text-blue-500 transition-colors">Resources</Link>
-            </nav>
+            
           </div>
           <div className="flex items-center space-x-4">
             <form className="hidden lg:block">
@@ -47,19 +43,12 @@ const Home: React.FC = () => {
           <div className="container mx-auto px-4">
             <div className="max-w-3xl mx-auto text-center">
               <h1 className="text-4xl md:text-6xl font-bold text-gray-900 mb-6">
-                Unleash the potential of every team
+                Welcome to query management application 
               </h1>
               <p className="text-xl md:text-2xl text-gray-600 mb-8">
-                Powerful tools for collaboration, project management, and productivity. Designed for teams of all sizes.
+                Please signup to see the query management working
               </p>
-              <div className="flex flex-col sm:flex-row justify-center items-center space-y-4 sm:space-y-0 sm:space-x-4">
-                <Button size="lg" className="w-full sm:w-auto">
-                  Start for free
-                </Button>
-                <Button variant="outline" size="lg" className="w-full sm:w-auto">
-                  See all products
-                </Button>
-              </div>
+            
             </div>
           </div>
         </section>
@@ -68,26 +57,7 @@ const Home: React.FC = () => {
 
 
         <section className="py-20">
-          <div className="container mx-auto px-4">
-            <div className="max-w-3xl mx-auto text-center">
-              <h2 className="text-3xl md:text-4xl font-bold mb-6">
-                Atlassian for teams of all sizes and stages
-              </h2>
-              <p className="text-xl text-gray-600 mb-8">
-                Whether you're a small startup or a large enterprise, we have solutions to fit your needs.
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                {['Startups', 'Small Business', 'Enterprise'].map((category) => (
-                  <div key={category} className="bg-white p-6 rounded-lg shadow-md">
-                    <h3 className="text-xl font-semibold mb-4">{category}</h3>
-                    <Button variant="outline" className="w-full">
-                      Learn more
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
+      
         </section>
       </main>
 
@@ -139,9 +109,7 @@ const Home: React.FC = () => {
               </div>
             </div>
           </div>
-          <div className="mt-8 pt-8 border-t border-gray-700 text-sm text-gray-400">
-            <p>&copy; 2023 Atlassian. All rights reserved.</p>
-          </div>
+
         </div>
       </footer>
     </div>
