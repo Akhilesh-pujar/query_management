@@ -59,10 +59,10 @@ export const CustomerPage: React.FC = () => {
 
         // Ensure data mapping includes 'status'
         const mappedQueries: Query[] = data.map((item: any) => ({
-          queryNumber: item.query_number,
+          queryNumber: item.queryNumber,
           title: item.title,
           subject: item.subject,
-          queryTo: item.query_to,
+          queryTo: item.queryTo,
           priority: item.priority,
           status: item.status, // Map 'status' field
         }));

@@ -35,7 +35,7 @@ export default function SignUp() {
       contact_number: '',
       password: '',
       user_type: 'Customer',
-      otp: ' ',
+      otp: '',
     },
   });
 

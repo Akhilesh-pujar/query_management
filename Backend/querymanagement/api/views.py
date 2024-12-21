@@ -1,5 +1,6 @@
 
 import uuid
+from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -11,14 +12,13 @@ from django.utils.timezone import now, timedelta
 from django.core.cache import cache
 from .serializers import UserSerializer
 from django.contrib.auth import authenticate, login
-from .models import Query,User
+from .models import Query, QueryHistory,User
 import logging
 from django.core.validators import validate_email
 from django.core.exceptions import ValidationError
 from django.contrib.auth import get_user_model
 from django.db import transaction
-from django.utils import timezone
-import random
+
 
 
 from .serializers import QuerySerializer,QueryAssignSerializer
@@ -356,6 +356,7 @@ class QueryListView(APIView):
                 'subject': query.subject,
                 'queryTo': str(query.query_to),
                 'priority': query.priority,
+                'status' : query.status,
             }
             for query in queries
         ]
@@ -405,6 +406,7 @@ class InternalQueryView(APIView):
             }
             for query in queries
         ]
+        print("409response-----------------", response_data)
 
         return Response(response_data, status=status.HTTP_200_OK)
           
@@ -467,6 +469,7 @@ class UpdateQueryView(generics.UpdateAPIView):
 
         # Update the query instance with the validated data
         try:
+          
             instance.assigned_to = staff_user
             instance.status = querystatus
             instance.query_to = department
@@ -487,3 +490,39 @@ class UpdateQueryView(generics.UpdateAPIView):
             )
 
 
+class AddQueryHistory(APIView):
+    def post(self, request):
+        try:
+         
+            
+            query_number = request.data.get("query_number")
+            comment = request.data.get("comment")
+            queryStatus = request.data.get("queryStatus")
+            updated_by = request.data.get("updated_by")
+
+            if not query_number or not comment or not queryStatus:
+                return Response(
+                    {"error": "Both 'query_number' and 'comment' are required."},
+                    status=400,
+                )
+
+            try:
+                query = Query.objects.get(query_number=query_number)
+            except Query.DoesNotExist:
+                return Response(
+                    {"error": f"Query with number {query_number} does not exist."},
+                    status=404,
+                )
+
+            # Create a new QueryHistory entry
+            QueryHistory.objects.create(query=query, comment=comment , queryStatus=queryStatus , updated_by=updated_by)
+
+            return Response({"message": "Query history added successfully."}, status=201)
+
+        except Exception as e:
+            return Response({"error": "Invalid JSON payload."}, status=400)
+        except Exception as e:
+            return Response(
+                {"error": f"An unexpected error occurred: {str(e)}"}, status=500
+            )
+    

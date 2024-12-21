@@ -1,7 +1,7 @@
 from django.urls import path
 
-from api.views import SignupInitView,VerifyEmailOTPView, VerifyEmailOTPView, QueryListView,LoginView,RaiseQueryView,UpdateQueryView,InternalQueryView
-from rest_framework_simplejwt.views import(TokenObtainPairView, TokenRefreshView)
+from api.views import SignupInitView,VerifyEmailOTPView, VerifyEmailOTPView, QueryListView,LoginView,RaiseQueryView,UpdateQueryView,InternalQueryView,AddQueryHistory
+
 urlpatterns = [
     # Authentication URLs
    path('userdata-cache-withotp/', SignupInitView.as_view(), name='signup'),  # Sign-up page
@@ -15,8 +15,8 @@ urlpatterns = [
     path('queries/update/', UpdateQueryView.as_view(), name='update-query'),
     
 
-    path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
-    path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path('addcommenttoquery/', AddQueryHistory.as_view(), name='token_obtain_pair'),
+   
     
    
   

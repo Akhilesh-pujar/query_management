@@ -1,9 +1,10 @@
-import  { useState } from 'react';
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import { Toaster, toast } from 'react-hot-toast';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -40,7 +41,7 @@ export default function Login() {
         },
         body: JSON.stringify({
           email: data.email,
-          password: data.password
+          password: data.password,
         }),
       });
 
@@ -50,13 +51,11 @@ export default function Login() {
         throw new Error(result.message || 'Login failed');
       }
 
-      // Ensure userType is consistent (lowercase)
       const userType = result.userType.toLowerCase();
 
-      // Call login with token and userType
-      login(result.email,result.refreshToken, userType);
+      login(result.email, result.refreshToken, userType);
 
-      // Navigate based on user type
+      toast.success('Login successful!');
       if (userType === 'customer') {
         navigate('/customer');
       } else if (userType === 'internal') {
@@ -66,12 +65,16 @@ export default function Login() {
       }
     } catch (error) {
       console.error('Login error:', error);
+      toast.error(
+        error instanceof Error ? error.message : 'Something went wrong'
+      );
       setError(error instanceof Error ? error.message : 'Something went wrong');
     }
   };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100">
+      <Toaster position="top-right" reverseOrder={false} />
       <Card className="w-[350px] shadow-lg">
         <CardHeader>
           <CardTitle>Login</CardTitle>

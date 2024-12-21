@@ -43,7 +43,7 @@ export interface QueryInterface {
   priority: Priority
   description: string
   attachment?: File
-  assignedTo?: string
+  assignTo?: string
   resolutionDate?: string
   status: Status
 }
@@ -57,7 +57,7 @@ export interface APIQueryResponse {
   queryTo: string
   priority: Priority
   description: string
-  assignedTo: string | null
+  assignTo: string | null
   resolutionDate: string | null
   status: Status
 }
@@ -90,7 +90,7 @@ const Query = () => {
 
   const mapAPIResponseToQuery = (apiQuery: APIQueryResponse): QueryInterface => ({
     ...apiQuery,
-    assignedTo: apiQuery.assignedTo || undefined,
+    assignTo: apiQuery.assignTo || undefined,
     resolutionDate: apiQuery.resolutionDate || undefined,
   })
 
@@ -233,7 +233,7 @@ const Query = () => {
             <TableCell>{query.dateRaised}</TableCell>
             <TableCell>{query.subject}</TableCell>
             <TableCell>{query.queryTo}</TableCell>
-            <TableCell>{query.assignedTo || 'Unassigned'}</TableCell>
+            <TableCell>{query.assignTo || 'Unassigned'}</TableCell>
             <TableCell>{query.resolutionDate || 'N/A'}</TableCell>
             <TableCell>{query.status}</TableCell>
             <TableCell>
@@ -244,7 +244,7 @@ const Query = () => {
       if (open) {
         setSelectedQuery(query) // Set the specific query
         setFormData({
-          assignedTo: query.assignedTo || 'please enter staff email id',
+          assignedTo: query.assignTo || '',
           status: query.status,
           queryTo: query.queryTo,
         }) // Initialize form data with current query details
