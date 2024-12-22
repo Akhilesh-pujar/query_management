@@ -246,8 +246,8 @@ class RaiseQueryView(APIView):
     def post(self, request):
         try:
             # Extract email from the request data
-            email = request.data.get('email')
-            if not email:
+            requestemail = request.data.get('email')
+            if not requestemail:
                 return Response({
                     'error': 'Missing email',
                     'details': 'Email is required to create a query'
@@ -255,7 +255,7 @@ class RaiseQueryView(APIView):
 
             # Check if the email corresponds to a valid user
             try:
-                user = User.objects.get(email=email)
+                user = User.objects.get(email=requestemail)
             except User.DoesNotExist:
                 return Response({
                     'error': 'User not found',
@@ -263,7 +263,7 @@ class RaiseQueryView(APIView):
                 }, status=status.HTTP_404_NOT_FOUND)
 
             # Extract query number and validate its presence
-            query_number = request.data.get('queryNumber')
+            query_number = request.data.get('query_number')
             if not query_number:
                 return Response({
                     'error': 'Missing query number',
@@ -289,7 +289,7 @@ class RaiseQueryView(APIView):
                 'priority': request.data.get('priority', 'Low'),
                 'description': request.data.get('description'),
                 'status': request.data.get('status', 'Pending'),
-                'created_by': user.id
+               
             }
 
             # Handle attachment if present
@@ -313,6 +313,7 @@ class RaiseQueryView(APIView):
                 'title': query.title,
                 'priority': query.priority,
                 'status': query.status,
+                
             }, status=status.HTTP_201_CREATED)
 
         except Exception as e:
@@ -402,7 +403,8 @@ class InternalQueryView(APIView):
                 'queryTo': str(query.query_to),
                 'priority': query.priority,
                 'status': query.status,
-                'assignTo': str(query.assigned_to)
+                'assignTo': str(query.assigned_to),
+               
             }
             for query in queries
         ]
@@ -506,16 +508,29 @@ class AddQueryHistory(APIView):
 
             try:
                 query_instance = Query.objects.get(query_number=query_number)
-                user_object = User.objects.get(email=updated_by)
+                user_object = User.objects.filter(email=updated_by,user_type="Internal").first()
             except Query.DoesNotExist:
                 return Response(
                     {"error": f"Query with number {query_number} does not exist."},
                     status=404,
                 )
+            
+             # Check if the user is internal
+            if not user_object:
+                return Response(
+                    {"error": "Only internal users can update query history."},
+                    status=403,
+                )
 
             QueryHistory.objects.create(query=query_instance, comment=comment , status=status , updated_by=user_object)
 
-            return Response({"message": "Query history added successfully."}, status=201)
+            query_history_comments = QueryHistory.objects.filter(query=query_instance).values(
+                "comment", "status", "updated_by__email", "created_at"
+            )
+            return Response({
+                 "message": "Query history added successfully.",
+                  "query_number": query_number,
+                 "query_history": list(query_history_comments)}, status=201)
 
         except Exception as e:
             return Response({"error": "Invalid JSON payload."}, status=400)

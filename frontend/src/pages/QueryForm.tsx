@@ -12,7 +12,7 @@ import {
 import { useForm } from 'react-hook-form';
 
 interface QueryFormData {
-  queryNumber: string;
+  query_number: string;
   title: string;
   subject: string;
   queryTo: string;
@@ -26,7 +26,7 @@ interface QueryFormProps {
   onSubmit: (query: QueryFormData) => void;
 }
 
-function generateQueryNumber(): string {
+function generatequery_number(): string {
   const prefix = 'QRY';
   const timestamp = Date.now().toString().slice(-6);
   const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
@@ -36,7 +36,7 @@ function generateQueryNumber(): string {
 export const QueryForm: React.FC<QueryFormProps> = ({ onSubmit }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [currentQueryNumber, setCurrentQueryNumber] = useState('');
+  const [currentquery_number, setCurrentquery_number] = useState('');
 
   const { register, handleSubmit, setValue, watch, formState: { errors } } = useForm<QueryFormData>({
     defaultValues: {
@@ -46,9 +46,12 @@ export const QueryForm: React.FC<QueryFormProps> = ({ onSubmit }) => {
   });
 
   useEffect(() => {
-    const newQueryNumber = generateQueryNumber();
-    setCurrentQueryNumber(newQueryNumber);
-    setValue('queryNumber', newQueryNumber);
+    if(!currentquery_number){
+      const newquery_number = generatequery_number();
+      setCurrentquery_number(newquery_number);
+      setValue('query_number', newquery_number);
+
+    }
   }, [setValue]);
 
   const validateForm = (data: QueryFormData): string | null => {
@@ -60,7 +63,7 @@ export const QueryForm: React.FC<QueryFormProps> = ({ onSubmit }) => {
   };
  
   const onSubmitForm = async (data: QueryFormData) => {
-    if (!currentQueryNumber) {
+    if (!currentquery_number) {
       setError("Query number not generated. Please try again.");
       return;
     }
@@ -76,7 +79,7 @@ export const QueryForm: React.FC<QueryFormProps> = ({ onSubmit }) => {
 
     // Create FormData matching exact payload structure
     const formData = new FormData();
-    formData.append('queryNumber', currentQueryNumber);
+    formData.append('query_number', currentquery_number);
     formData.append('priority', data.priority);
     formData.append('status', data.status);
     formData.append('title', data.title);
@@ -113,7 +116,7 @@ export const QueryForm: React.FC<QueryFormProps> = ({ onSubmit }) => {
       }
 
       const result = await response.json();
-      console.log('Submit success:', result);
+      
       onSubmit(result);
     } catch (error) {
       console.error("Error submitting query:", error);
@@ -134,8 +137,8 @@ export const QueryForm: React.FC<QueryFormProps> = ({ onSubmit }) => {
       {/* Hidden query number field */}
       <input 
         type="hidden" 
-        {...register("queryNumber")} 
-        value={currentQueryNumber} 
+        {...register("query_number")} 
+        value={currentquery_number} 
       />
 
       <Input
@@ -198,13 +201,13 @@ export const QueryForm: React.FC<QueryFormProps> = ({ onSubmit }) => {
       />
       {errors.description && <p className="text-red-500">Description is required</p>}
 
-      <Input
+      <Input 
         type="file"
         {...register("attachment")}
         className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-violet-50 file:text-violet-700 hover:file:bg-violet-100"
       />
 
-      <Button type="submit" disabled={isSubmitting}>
+      <Button className='flex justify-center w-full' type="submit" disabled={isSubmitting}>
         {isSubmitting ? "Submitting..." : "Submit Query"}
       </Button>
     </form>

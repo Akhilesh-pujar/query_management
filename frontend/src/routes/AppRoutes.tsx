@@ -2,7 +2,7 @@ import React from 'react';
 import {   Route, Routes } from 'react-router-dom';
 import Login from '../pages/Login';
 import {CustomerPage }from '../pages/CustomerPage';
-import Query from '../pages/Query';
+import Query from '../pages/InternalQuery';
 import ProtectedRoute from '../component/ProtectectedRoute';
 import Home from "../pages/Home"
 import Signup from '../pages/Signup'
