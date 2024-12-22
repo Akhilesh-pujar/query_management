@@ -23,7 +23,7 @@ def send_email_otp(email, otp):
     
 # Send OTP to phone using Firebase
 def send_phone_otp(user_phone, otp):
-    url = f"https://2factor.in/API/v1e6b5deb5-bab2-11ef-8b17-0200cd936042/SMS/{user_phone}/{otp}/Your otpis"
+    url = f"https://2factor.in/API/v1e6b5deb5-bab2-11ef-8b17-0200cd936042/SMS/{user_phone}/{otp}/"
     payload = ""
     headers = {"content-type":"application/x-www-form-urlencoded"}
 

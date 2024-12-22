@@ -5,7 +5,8 @@ from .models import (
     User,
     Query,
     QueryHistory,
-    Department
+    Department,
+    Comment
  
 )
 class CustomUserAdmin(UserAdmin):
@@ -65,6 +66,17 @@ class AssetNameAdmin(admin.ModelAdmin):
     list_display = ('name', 'code', 'status', 'created_at')  
     search_fields = ("Department",)
     list_filter = ("status",)
+
+
+
+
+@admin.register(Comment)
+class AssetNameAdmin(admin.ModelAdmin):
+    list_display = ('user', 'query', 'comment', 'description', 'created_at')  
+    search_fields = ("user", 'query')
+    list_filter = ("user", 'query', 'comment')
+
+
 
 # Register the custom user model and admin
 admin.site.register(User, CustomUserAdmin)

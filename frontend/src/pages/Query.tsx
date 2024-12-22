@@ -28,12 +28,22 @@ import {
 
 import { Toaster } from '@/components/ui/toaster'
 import { toast } from '@/hooks/use-toast'
+import { Textarea } from '@/components/ui/textarea'
+
+import { ChevronDown, ChevronUp } from "lucide-react"
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion"
 
 
-export type Priority = 'Low' | 'Medium' | 'High'
-export type Status = 'open' | 'in-progress' | 'resolved'
 
-export interface QueryInterface {
+ type Priority = 'Low' | 'Medium' | 'High'
+ type Status = 'open' | 'In Progress' | 'Resolved'
+
+interface QueryInterface {
   serialNumber: number
   queryNumber: string
   dateRaised: string
@@ -48,7 +58,7 @@ export interface QueryInterface {
   status: Status
 }
 
-export interface APIQueryResponse {
+ interface APIQueryResponse {
   serialNumber: number
   queryNumber: string
   dateRaised: string
@@ -62,10 +72,16 @@ export interface APIQueryResponse {
   status: Status
 }
 
-export interface UpdateQueryPayload {
+interface UpdateQueryPayload {
   assignedTo: string
   status: Status
   queryTo: string
+}
+interface CommentFormData {
+  query_number: string
+  comment: string
+  updated_by: string
+  status: Status
 }
 
 
@@ -82,6 +98,16 @@ const Query = () => {
     status: 'open',
     queryTo: '',
   })
+  const [expandedRow, setExpandedRow] = useState<string | null>(null);
+
+  const [commentDialogOpen, setCommentDialogOpen] = useState(false)
+  const [commentFormData, setCommentFormData] = useState<CommentFormData>({
+    query_number: '',
+    comment: '',
+    updated_by: localStorage.getItem('email') || '', // Initialize with email from localStorage
+    status: 'open',
+  })
+  
   const [updating, setUpdating] = useState(false)
 
   useEffect(() => {
@@ -168,7 +194,7 @@ const Query = () => {
             : q
         )
       )
-        fetchQueries();
+        await fetchQueries();
       toast({
         title: "Success",
         description: "Query updated successfully",
@@ -183,6 +209,38 @@ const Query = () => {
       })
     } finally {
       setUpdating(false)
+    }
+  }
+
+  const handleCommentSubmit = async () => {
+    try {
+      const response = await fetch(`${API_URL}/api/queryhistory/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...commentFormData,
+          }),
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+    // Refresh queries to get updated comments
+      setCommentDialogOpen(false)
+      toast({
+        title: "Success",
+        description: "Comment added successfully",
+      })
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred'
+      toast({
+        variant: "destructive",
+        title: "Error adding comment",
+        description: errorMessage,
+      })
     }
   }
 
@@ -216,13 +274,15 @@ const Query = () => {
         <TableRow>
           <TableHead>Serial No.</TableHead>
           <TableHead>Query Number</TableHead>
-          <TableHead>Date Raised</TableHead>
+         
           <TableHead>Subject</TableHead>
           <TableHead>Query To</TableHead>
           <TableHead>Assigned To</TableHead>
-          <TableHead>Resolution Date</TableHead>
+          
           <TableHead>Status</TableHead>
           <TableHead>Actions</TableHead>
+          <TableHead>Comment</TableHead>
+          
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -230,11 +290,11 @@ const Query = () => {
           <TableRow key={query.queryNumber}>
             <TableCell>{query.serialNumber}</TableCell>
             <TableCell>{query.queryNumber}</TableCell>
-            <TableCell>{query.dateRaised}</TableCell>
+           
             <TableCell>{query.subject}</TableCell>
             <TableCell>{query.queryTo}</TableCell>
             <TableCell>{query.assignTo || 'Unassigned'}</TableCell>
-            <TableCell>{query.resolutionDate || 'N/A'}</TableCell>
+           
             <TableCell>{query.status}</TableCell>
             <TableCell>
   <Dialog
@@ -314,7 +374,97 @@ const Query = () => {
       </DialogFooter>
     </DialogContent>
   </Dialog>
+  
 </TableCell>
+{/* ---------------------comment ------------------------------*/}
+<TableCell>
+
+ 
+
+<Dialog
+open={commentDialogOpen && selectedQuery?.queryNumber === query.queryNumber} 
+onOpenChange={ 
+  
+ setCommentDialogOpen}>
+           <DialogTrigger asChild>
+             <Button variant="outline">Comment</Button>
+           </DialogTrigger>
+         
+           <DialogContent>
+             <DialogHeader>
+               <DialogTitle>Add Comment to Query: {selectedQuery?.queryNumber || query.queryNumber}</DialogTitle>
+             </DialogHeader>
+             <div className="grid gap-4 py-4">
+               <div className="grid grid-cols-4 items-center gap-4">
+                 <label htmlFor="updated_by">Updated By:</label>
+                 <Input
+                   id="updated_by"
+                   value={commentFormData.updated_by}
+                   className="col-span-3"
+                   onChange={(e) => setCommentFormData((prev) => ({ 
+                     ...prev, 
+                     updated_by: e.target.value,
+                     
+                   }))}
+                 />
+               </div>
+               <div className="grid grid-cols-4 items-center gap-4">
+                 <label htmlFor="updated_by">Query number:</label>
+                 <Input
+                   id="query_number"
+                   value={commentFormData.query_number}
+                   className="col-span-3"
+                   onChange={(e) => setCommentFormData((prev) => ({ 
+                     ...prev, 
+                     query_number: e.target.value,
+                     
+                   }))}
+                 />
+               </div>
+               <div className="grid grid-cols-4 items-center gap-4">
+                 <label htmlFor="status">Status:</label>
+                 <Select
+                   onValueChange={(value) => setCommentFormData((prev) => ({ 
+                     ...prev, 
+                     status: value as Status 
+                   }))}
+                   value={commentFormData.status}
+                 >
+                   <SelectTrigger className="col-span-3">
+                     <SelectValue placeholder="Select status" />
+                   </SelectTrigger>
+                   <SelectContent>
+                     <SelectItem value="open">Open</SelectItem>
+                     <SelectItem value="In Progress">In Progress</SelectItem>
+                     <SelectItem value="Resolved">Resolved</SelectItem>
+                   </SelectContent>
+                 </Select>
+               </div>
+               <div className="grid grid-cols-4 items-center gap-4">
+                 <label htmlFor="comment">Comment:</label>
+                 <Textarea
+                   id="comment"
+                   value={commentFormData.comment}
+                   className="col-span-3"
+                   onChange={(e) => setCommentFormData((prev) => ({ 
+                     ...prev, 
+                     comment: e.target.value 
+                   }))}
+                 />
+               </div>
+             </div>
+             <DialogFooter>
+               <Button variant="outline" onClick={() => setCommentDialogOpen(false)}>
+                 Cancel
+               </Button>
+               <Button onClick={handleCommentSubmit}>
+                 Add Comment
+               </Button>
+             </DialogFooter>
+           </DialogContent>
+         </Dialog>
+         </TableCell>
+        
 
           </TableRow>
         ))}

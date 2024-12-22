@@ -26,7 +26,7 @@ from .permissions import IsInternalUser
 from rest_framework_simplejwt.tokens import RefreshToken
 
 
-from .models import Department
+from .models import Department, Comment
 
 
 
@@ -406,7 +406,7 @@ class InternalQueryView(APIView):
             }
             for query in queries
         ]
-        print("409response-----------------", response_data)
+        
 
         return Response(response_data, status=status.HTTP_200_OK)
           
@@ -493,29 +493,27 @@ class UpdateQueryView(generics.UpdateAPIView):
 class AddQueryHistory(APIView):
     def post(self, request):
         try:
-         
-            
-            query_number = request.data.get("query_number")
-            comment = request.data.get("comment")
-            queryStatus = request.data.get("queryStatus")
+            query_number = request.data.get("query_number")        
+            status = request.data.get("status")
             updated_by = request.data.get("updated_by")
+            comment = request.data.get("comment")
 
-            if not query_number or not comment or not queryStatus:
+            if not query_number or not comment or not status:
                 return Response(
                     {"error": "Both 'query_number' and 'comment' are required."},
                     status=400,
                 )
 
             try:
-                query = Query.objects.get(query_number=query_number)
+                query_instance = Query.objects.get(query_number=query_number)
+                user_object = User.objects.get(email=updated_by)
             except Query.DoesNotExist:
                 return Response(
                     {"error": f"Query with number {query_number} does not exist."},
                     status=404,
                 )
 
-            # Create a new QueryHistory entry
-            QueryHistory.objects.create(query=query, comment=comment , queryStatus=queryStatus , updated_by=updated_by)
+            QueryHistory.objects.create(query=query_instance, comment=comment , status=status , updated_by=user_object)
 
             return Response({"message": "Query history added successfully."}, status=201)
 
@@ -526,3 +524,46 @@ class AddQueryHistory(APIView):
                 {"error": f"An unexpected error occurred: {str(e)}"}, status=500
             )
     
+
+
+class AddComment(APIView):
+    def post(self, request):
+        try:
+            user = request.data.get("user")    
+            query = request.data.get('query')    
+            comment = request.data.get("comment")
+            description = request.data.get("description")
+           
+            if  not all([user, comment, description, query]):
+                return Response(
+                    {"error": "Both 'query_number' and 'comment' are required."},
+                    status=400,
+                )
+
+            try:
+                user_object = User.objects.get(email=user)
+                query_instance = Query.objects.get(query_number=query)
+            except Query.DoesNotExist:
+                return Response(
+                    {"error": f"User {user} does not exist."},
+                    status=404,
+                )
+
+            Comment.objects.create(user=user_object, query=query_instance, comment=comment , description=description)
+
+            return Response({"message": "Comment added successfully."}, status=201)
+
+        except Exception as e:
+            return Response({"error": "Invalid JSON payload."}, status=400)
+        except Exception as e:
+            return Response(
+                {"error": f"An unexpected error occurred: {str(e)}"}, status=500
+            )
+    
+
+
+
+
+
+
+
