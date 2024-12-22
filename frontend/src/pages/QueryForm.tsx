@@ -15,7 +15,7 @@ interface QueryFormData {
   query_number: string;
   title: string;
   subject: string;
-  queryTo: string;
+  query_to: string;
   priority: "Low" | "Medium" | "High";
   description: string;
   status: "Pending" | "In Progress";
@@ -57,7 +57,7 @@ export const QueryForm: React.FC<QueryFormProps> = ({ onSubmit }) => {
   const validateForm = (data: QueryFormData): string | null => {
     if (!data.title || data.title.length < 3) return "Title must be at least 3 characters long.";
     if (!data.subject || data.subject.length < 3) return "Subject must be at least 3 characters long.";
-    if (!data.queryTo) return "Please select a department.";
+    if (!data.query_to) return "Please select a department.";
     if (!data.description || data.description.length < 10) return "Description must be at least 10 characters long.";
     return null;
   };
@@ -85,7 +85,7 @@ export const QueryForm: React.FC<QueryFormProps> = ({ onSubmit }) => {
     formData.append('title', data.title);
     formData.append('subject', data.subject);
     formData.append('description', data.description);
-    formData.append('queryTo', data.queryTo);
+    formData.append('query_to', data.query_to);
     
     // Add attachment if exists
     if (data.attachment instanceof FileList && data.attachment.length > 0) {
@@ -154,8 +154,8 @@ export const QueryForm: React.FC<QueryFormProps> = ({ onSubmit }) => {
       {errors.subject && <p className="text-red-500">Subject is required</p>}
 
       <Select
-        onValueChange={(value) => setValue("queryTo", value)}
-        value={watch("queryTo")}
+        onValueChange={(value) => setValue("query_to", value)}
+        value={watch("query_to")}
       >
         <SelectTrigger>
           <SelectValue placeholder="Select Department" />
@@ -166,7 +166,7 @@ export const QueryForm: React.FC<QueryFormProps> = ({ onSubmit }) => {
           <SelectItem value="HARDWARE SUPPORT">Hardware Support</SelectItem>
         </SelectContent>
       </Select>
-      {errors.queryTo && <p className="text-red-500">Please select a department</p>}
+      {errors.query_to && <p className="text-red-500">Please select a department</p>}
 
       <Select
         onValueChange={(value) => setValue("status", value as "Pending" | "In Progress")}

@@ -3,8 +3,8 @@ import random
 from django.core.mail import send_mail
 import requests
 from django.conf import settings
-
-
+import logging
+import requests
 
 # Generate OTP
 def generate_otp():
@@ -22,13 +22,28 @@ def send_email_otp(email, otp):
     
     
 # Send OTP to phone using Firebase
-def send_phone_otp(user_phone, otp):
-    url = f"https://2factor.in/API/v1e6b5deb5-bab2-11ef-8b17-0200cd936042/SMS/{user_phone}/{otp}/"
-    payload = ""
-    headers = {"content-type":"application/x-www-form-urlencoded"}
-
-    response = requests.get(url, data=payload, headers=headers)
-    return bool(response.ok)
+def send_phone_otp(phone_number, otp):
+    print("phone number --------------", phone_number, otp)
+    try:
+        # You can either use the direct OTP sending method (as before):
+        url = f"https://2factor.in/API/V1/{settings.SMS_API_KEY}/SMS/{phone_number}/{otp}/hi how areyou"
+        headers = {"content-type": "application/json"}
+        response = requests.get(url, headers=headers)
+        
+        if response.status_code == 500:
+            logging.error(f"2Factor API Error: {response.text}")
+            return False
+            
+        response.raise_for_status()
+        return otp
+        
+        # Log successful response for debugging
+        logging.info(f"2Factor API Response: {response.text}")
+        return True
+        
+    except requests.exceptions.RequestException as e:
+        logging.error(f"Phone OTP Error: {str(e)}")
+        return False
 
 
     

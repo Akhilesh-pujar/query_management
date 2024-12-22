@@ -1,33 +1,39 @@
 import React, { useState, useEffect } from "react";
+import Fuse from "fuse.js"; // Import fuse.js
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { QueryForm } from "./QueryForm";
+import {
+  Table,
+  TableBody,
+  TableCaption,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { useAuth } from "../hooks/useAuth";
+import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import { QueryForm } from "./QueryForm";
 import { z } from "zod";
 
 export const querySchema = z.object({
   title: z.string().min(1, "Title is required"),
   subject: z.string().min(1, "Subject is required"),
-  queryTo: z.string().min(1, "Query To is required"),
+  query_to: z.string().min(1, "Query To is required"),
   priority: z.enum(["Low", "Medium", "High"]),
   description: z.string().min(1, "Description is required"),
 });
 
 export type Query = z.infer<typeof querySchema> & {
   query_number: string;
-  status: string; // Added the 'status' field
+  status: string;
   attachment?: File;
 };
 
 export const CustomerPage: React.FC = () => {
   const [queries, setQueries] = useState<Query[]>([]);
-  const [filteredQueries, setFilteredQueries] = useState<Query[]>([]);
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchTerm, setSearchTerm] = useState(""); // State for search term
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const { token } = useAuth();
+  const { token, logout } = useAuth();
 
   useEffect(() => {
     const fetchQueries = async () => {
@@ -56,13 +62,12 @@ export const CustomerPage: React.FC = () => {
           query_number: item.query_number,
           title: item.title,
           subject: item.subject,
-          queryTo: item.queryTo,
+          query_to: item.query_to,
           priority: item.priority,
           status: item.status,
         }));
 
         setQueries(mappedQueries);
-        setFilteredQueries(mappedQueries);
       } catch (error) {
         console.error("Error fetching queries:", error);
       }
@@ -70,54 +75,44 @@ export const CustomerPage: React.FC = () => {
     fetchQueries();
   }, [token]);
 
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      const lowercasedTerm = searchTerm.toLowerCase();
-      setFilteredQueries(
-        queries.filter(
-          (query) =>
-            query.query_number.toLowerCase().includes(lowercasedTerm) ||
-            query.title.toLowerCase().includes(lowercasedTerm) ||
-            query.subject.toLowerCase().includes(lowercasedTerm) ||
-            query.status.toLowerCase().includes(lowercasedTerm)
-        )
-      );
-    }, 300); // Debounce delay
-
-    return () => clearTimeout(handler);
-  }, [searchTerm, queries]);
-
   const handleQuerySubmit = (newQuery: Query) => {
     setQueries([...queries, newQuery]);
-    setFilteredQueries([...filteredQueries, newQuery]);
     setIsDialogOpen(false);
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status.toLowerCase()) {
-      case "in progress":
-        return "bg-yellow-500 text-white";
-      case "pending":
-        return "bg-orange-500 text-white";
-      case "resolved":
-        return "bg-green-500 text-white";
-      default:
-        return "bg-gray-500 text-white";
-    }
+  const handleLogout = () => {
+    logout();
+    window.location.href = "/login";
   };
+
+  // Configure Fuse.js
+  const fuse = new Fuse(queries, {
+    keys: ["query_number", "title", "subject", "query_to", "priority", "status"], // Fields to search
+    threshold: 0.3, // Adjust for sensitivity
+  });
+
+  const filteredQueries =
+    searchTerm.trim() === ""
+      ? queries // Show all queries if no search term
+      : fuse.search(searchTerm).map((result) => result.item);
 
   return (
     <div className="container mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-4">Customer Query Management</h1>
+      <div className="flex justify-between items-center mb-4">
+        <h1 className="text-2xl font-bold">Customer Query Management</h1>
+        <Button variant="destructive" onClick={handleLogout}>
+          Logout
+        </Button>
+      </div>
 
-      {/* Search Bar */}
-      <div className="mb-4 flex justify-center">
-        <Input
+      {/* Search Input */}
+      <div className="mb-4">
+        <input
           type="text"
-          placeholder="Search queries by number, title, subject, or status..."
+          placeholder="Search queries..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full max-w-md border rounded-md px-4 py-2"
+          className="w-full px-4 py-2 border rounded"
         />
       </div>
 
@@ -130,46 +125,37 @@ export const CustomerPage: React.FC = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-8">
-        {filteredQueries.length > 0 ? (
-          filteredQueries.map((query) => (
-            <Card key={query.query_number} className="shadow-md">
-              <CardHeader>
-                <CardTitle className="flex justify-between">
-                  <span>{query.title}</span>
-                  <Badge className={`px-2 py-1 rounded-lg ${getStatusBadge(query.status)}`}>
-                    {query.status}
-                  </Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p>
-                  <strong>Query Number:</strong> {query.query_number}
-                </p>
-                <p>
-                  <strong>Subject:</strong> {query.subject}
-                </p>
-                <p>
-                  <strong>Query To:</strong> {query.queryTo}
-                </p>
-                <p>
-                  <strong>Priority:</strong> {query.priority}
-                </p>
-              </CardContent>
-              <CardFooter>
-                <p className="text-sm text-gray-500">
-                  Raised query related to {query.subject}.
-                </p>
-              </CardFooter>
-            </Card>
-          ))
-        ) : (
-          <p className="text-center text-gray-500 col-span-full">
-            No queries found matching your search criteria.
-          </p>
-        )}
-      </div>
+      <Table className="mt-8">
+        <TableCaption>List of Raised Queries</TableCaption>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Query Number</TableHead>
+            <TableHead>Title</TableHead>
+            <TableHead>Subject</TableHead>
+            <TableHead>Query To</TableHead>
+            <TableHead>Priority</TableHead>
+            <TableHead>Status</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {filteredQueries.length > 0 ? (
+            filteredQueries.map((query) => (
+              <TableRow key={query.query_number}>
+                <TableCell>{query.query_number}</TableCell>
+                <TableCell>{query.title}</TableCell>
+                <TableCell>{query.subject}</TableCell>
+                <TableCell>{query.query_to}</TableCell>
+                <TableCell>{query.priority}</TableCell>
+                <TableCell>{query.status}</TableCell>
+              </TableRow>
+            ))
+          ) : (
+            <TableRow>
+              <TableCell colSpan={6}>No matching queries found.</TableCell>
+            </TableRow>
+          )}
+        </TableBody>
+      </Table>
     </div>
   );
 };

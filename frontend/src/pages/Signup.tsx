@@ -17,6 +17,7 @@ const signUpSchema = z.object({
   password: z.string().min(8, 'Password must be at least 8 characters'),
   user_type: z.enum(['Internal', 'Customer']),
   otp: z.string().length(6, 'Email OTP must be 6 digits'),
+  phone_otp: z.string().length(6, 'Email OTP must be 6 digits'),
 });
 
 type SignUpForm = z.infer<typeof signUpSchema>;
@@ -36,6 +37,7 @@ export default function SignUp() {
       password: '',
       user_type: 'Customer',
       otp: '',
+      phone_otp:''
     },
   });
 
@@ -73,7 +75,7 @@ export default function SignUp() {
       setOtpSent(true);
       setSignUpEnabled(true);
       setsession_id(result.session_id);
-      alert('OTP sent successfully to your email');
+      alert('Email and Mobile OTP sent successfully to your email');
     } catch (error) {
       console.error('Error:', error);
       alert(error instanceof Error ? error.message : 'Failed to send OTP. Please try again.');
@@ -90,6 +92,7 @@ export default function SignUp() {
         body: JSON.stringify({
           session_id,
           otp:data.otp,
+          phone_otp:data.phone_otp
         
         }),
       });
@@ -224,9 +227,31 @@ export default function SignUp() {
                         <FormMessage />
                       </FormItem>
                       
+                      
                     )}
                   />
                 </div>
+                
+              )}
+              {otpSent && (
+                <div className="grid grid-cols-1 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="phone_otp"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Phone OTP</FormLabel>
+                        <FormControl>
+                          <Input {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                      
+                      
+                    )}
+                  />
+                </div>
+                
               )}
               <Button type="submit" className="w-full" disabled={!isSignUpEnabled}>
                 Sign Up

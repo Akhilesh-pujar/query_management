@@ -43,6 +43,9 @@ class SignupInitView(APIView):
 
         # Email validation
         email = request.data.get('email')
+        phone_number = request.data.get('contact_number')
+        print("request data----------------", request.data)
+        print("request data----------------", phone_number)
         try:
             validate_email(email)
         except ValidationError:
@@ -65,19 +68,12 @@ class SignupInitView(APIView):
             # Generate OTPs
             email_otp = generate_otp()
             email_result = send_email_otp(email, email_otp)
-            # phone_otp = generate_otp()
-            expires_at = now() + timedelta(minutes=2)
+            phone_otp = generate_otp()
+            phone_result = send_phone_otp(phone_number,phone_otp)
+           
 
             # Generate a unique session ID
             session_id = str(uuid.uuid4())
-            
-            # Save OTP in the database
-            # OTP.objects.create(
-            #     email=email, 
-            #     # phone_otp=phone_otp, 
-            #     email_otp=email_otp, 
-            #     expires_at=expires_at
-            # )
             
             # Prepare user data for caching (excluding sensitive information)
             user_data = serializer.validated_data.copy()
@@ -85,25 +81,26 @@ class SignupInitView(APIView):
             # Store user details in cache with session ID
             cache.set(f'signup_session_{session_id}', {
                 'user_data': user_data,
-                'otp': email_otp
+                'otp': email_otp,
+                'phoneOtp':phone_result
             }, timeout=600)  # 10 minutes expiry
             
             # Send OTP via email
             
             
             # Check email sending result
-            if not email_result:
+            if not email_result or not phone_result:
                 # Log the email sending failure
                 logger.error(f"Failed to send OTP to {email}")
                 return Response({
                     'error': 'Failed to send OTP',
-                    'details': email_result or 'Unknown email sending error'
+                    'details': email_result or phone_result or 'Unknown email sending error'
                 }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
             
             # Successful OTP generation and sending
             return Response({
                 'session_id': session_id,
-                'message': 'OTP sent successfully'
+                'message': 'email OTP and phone otp sent successfully'
             }, status=status.HTTP_200_OK)
         
         except Exception as e:
@@ -123,9 +120,10 @@ class VerifyEmailOTPView(APIView):
         # Extract query_to and token from request
         session_id = request.data.get('session_id')
         token = request.data.get('otp')
+        phone_token = request.data.get('phone_otp')
 
         # Validate input
-        if not session_id or not token:
+        if not session_id or not token or not phone_token:
             return Response({
                 'error': 'Missing query_to or OTP',
                 'details': 'Both query_to and OTP are required'
@@ -144,10 +142,11 @@ class VerifyEmailOTPView(APIView):
 
         # Extract stored OTP and user data
         stored_otp = session_data.get('otp')
+        mobile_stored_otp = session_data.get('phoneOtp')
         user_data = session_data.get('user_data', {})
 
         # Verify OTP
-        if str(token) != str(stored_otp):
+        if str(token) != str(stored_otp) and str(phone_token) != str(mobile_stored_otp):
             return Response({
                 'error': 'Invalid OTP',
                 'details': 'The provided OTP does not match'
@@ -271,7 +270,7 @@ class RaiseQueryView(APIView):
                 }, status=status.HTTP_400_BAD_REQUEST)
 
             # Get department
-            department_name = request.data.get('queryTo')
+            department_name = request.data.get('query_to')
             try:
                 department = Department.objects.get(name=department_name)
             except Department.DoesNotExist:
@@ -313,6 +312,8 @@ class RaiseQueryView(APIView):
                 'title': query.title,
                 'priority': query.priority,
                 'status': query.status,
+                'subject':query.subject,
+                'query_to':str(query.query_to)
                 
             }, status=status.HTTP_201_CREATED)
 
@@ -352,10 +353,10 @@ class QueryListView(APIView):
         # Prepare response data
         response_data = [
             {
-                'queryNumber': query.query_number,
+                'query_number': query.query_number,
                 'title': query.title,
                 'subject': query.subject,
-                'queryTo': str(query.query_to),
+                'query_to': str(query.query_to),
                 'priority': query.priority,
                 'status' : query.status,
             }

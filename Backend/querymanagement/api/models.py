@@ -54,6 +54,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     )
     user_type = models.CharField(max_length=10, choices=USER_TYPE_CHOICES)
     email_otp = models.CharField(max_length=6, blank=True, null=True)
+    phone_otp = models.CharField(max_length=6, blank=True, null=True)
     
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)

@@ -1,113 +1,133 @@
-import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
+import React, { useState } from "react";
+import Fuse from "fuse.js"; // Import fuse.js
+import {
+  Table,
+  TableBody,
+  TableCaption,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+
 import { Query } from "@/types/query";
 import { QueryActions } from "./query-actions";
 import { QueryComments } from "./query-comments";
 import { ShowCommentsDialog } from "./show-comments-dailog";
+import { Button } from "@/components/ui/button";
 
-// Function to get the badge color based on the status
-const getStatusBadge = (status: string) => {
-  switch (status.toLowerCase()) {
-    case "in progress":
-      return "bg-yellow-500 text-white";
-    case "pending":
-      return "bg-orange-500 text-white";
-    case "resolved":
-      return "bg-green-500 text-white";
-    default:
-      return "bg-gray-500 text-white";
-  }
-};
+// Debounce Hook
+function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+ 
 
-interface QueryCardsProps {
+  React.useEffect(() => {
+    const handler = setTimeout(() => setDebouncedValue(value), delay);
+    return () => clearTimeout(handler);
+  }, [value, delay]);
+
+  return debouncedValue;
+}
+
+interface QueryTableProps {
   queries: Query[];
   onUpdateQuery: (queryNumber: string, data: any) => Promise<void>;
   onAddComment: (data: any) => Promise<void>;
 }
 
-export function QueryTable({ queries, onUpdateQuery, onAddComment }: QueryCardsProps) {
+export function QueryTable({ queries, onUpdateQuery, onAddComment }: QueryTableProps) {
   const [searchTerm, setSearchTerm] = useState("");
-  const [filteredQueries, setFilteredQueries] = useState<Query[]>(queries);
+  const debouncedSearchTerm = useDebounce(searchTerm, 300); // Debounce with 300ms delay
 
-  // Debounce implementation
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      const lowercasedTerm = searchTerm.toLowerCase();
-      setFilteredQueries(
-        queries.filter(
-          (query) =>
-            query.queryNumber.toLowerCase().includes(lowercasedTerm) ||
-            query.subject.toLowerCase().includes(lowercasedTerm) ||
-            query.status.toLowerCase().includes(lowercasedTerm)
-        )
-      );
-    }, 300); // Debounce delay: 300ms
+  // Configure Fuse.js
+  const fuse = new Fuse(queries, {
+    keys: ["queryNumber", "subject", "queryTo", "assignTo", "status"], // Fields to search
+    threshold: 0.3, // Adjust for sensitivity (lower = stricter match)
+  });
+  const handleLogout = () => {
+ 
+    window.location.href = "/login";
+  };
 
-    return () => clearTimeout(handler); // Cleanup on change
-  }, [searchTerm, queries]);
+  // Perform fuzzy search
+  const filteredQueries =
+    debouncedSearchTerm.trim() === ""
+      ? queries // Show all queries if no search term
+      : fuse.search(debouncedSearchTerm).map((result) => result.item);
 
+
+    
   return (
     <div>
-      {/* Search Bar */}
-      <div className="mb-4 flex justify-center">
-        <Input
+      <div className="flex justify-between items-center mb-4">
+        <h1 className="text-2xl font-bold">Internal Query Management</h1>
+        <Button variant="destructive" onClick={handleLogout}>
+          Logout
+        </Button>
+      </div>
+      {/* Search Input */}
+      <div style={{ marginBottom: "1rem" }}>
+        <input
           type="text"
-          placeholder="Search queries by number, subject, or status..."
+          placeholder="Search queries..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full max-w-md border rounded-md px-4 py-2"
+          style={{
+            width: "100%",
+            padding: "0.5rem",
+            borderRadius: "5px",
+            border: "1px solid #ccc",
+          }}
         />
       </div>
 
-      {/* Cards Display */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filteredQueries.length > 0 ? (
-          filteredQueries.map((query) => (
-            <Card key={query.queryNumber} className="shadow-md border">
-              <CardHeader>
-                <CardTitle className="text-lg font-semibold">
-                  Query Number: {query.queryNumber}
-                </CardTitle>
-                <CardDescription className="text-sm text-gray-500">
-                  Serial No.: {query.serialNumber}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  <p className="text-sm">
-                    <span className="font-medium">Subject:</span> {query.subject}
-                  </p>
-                  <p className="text-sm">
-                    <span className="font-medium">Query To:</span> {query.queryTo}
-                  </p>
-                  <p className="text-sm">
-                    <span className="font-medium">Assigned To:</span>{" "}
-                    {query.assignTo || "Unassigned"}
-                  </p>
-                  <div className="flex items-center space-x-2">
-                    <span className="font-medium text-sm">Status:</span>
-                    <Badge className={`px-2 py-1 rounded-lg ${getStatusBadge(query.status)}`}>
-                      {query.status}
-                    </Badge>
-                  </div>
-                </div>
-                <div className="mt-4 flex flex-wrap gap-2">
+      {/* Table */}
+      <Table>
+        <TableCaption>List of Customer Queries</TableCaption>
+        
+        <TableHeader>
+          <TableRow>
+            <TableHead>Query Number</TableHead>
+            <TableHead>Subject</TableHead>
+            <TableHead>Query To</TableHead>
+            <TableHead>Assigned To</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead>Actions</TableHead>
+            <TableHead>Comment</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {filteredQueries.length > 0 ? (
+            filteredQueries.map((query) => (
+              <TableRow key={query.queryNumber}>
+                <TableCell>{query.queryNumber}</TableCell>
+                <TableCell>{query.subject}</TableCell>
+                <TableCell>{query.queryTo}</TableCell>
+                <TableCell>{query.assignTo || "Unassigned"}</TableCell>
+                <TableCell>{query.status}</TableCell>
+                <TableCell>
                   <QueryActions query={query} onUpdate={onUpdateQuery} />
+                </TableCell>
+                <TableCell>
                   <QueryComments query={query} onAddComment={onAddComment} />
+                </TableCell>
+                <TableCell>
                   <ShowCommentsDialog
                     queryNumber={query.queryNumber}
                     comments={query.comments || []}
                   />
-                </div>
-              </CardContent>
-            </Card>
-          ))
-        ) : (
-          <p className="text-gray-500">No queries found matching your search criteria.</p>
-        )}
-      </div>
+                </TableCell>
+              </TableRow>
+            ))
+          ) : (
+            <TableRow>
+              <TableCell colSpan={7}>No matching queries found.</TableCell>
+            </TableRow>
+          )}
+        </TableBody>
+      </Table>
     </div>
   );
 }
+
+
