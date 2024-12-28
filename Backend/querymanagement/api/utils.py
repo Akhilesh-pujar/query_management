@@ -23,7 +23,7 @@ def send_email_otp(email, otp):
     
 # Send OTP to phone using Firebase
 def send_phone_otp(phone_number, otp):
-    print("phone number --------------", phone_number, otp)
+    
     try:
         # You can either use the direct OTP sending method (as before):
         url = f"https://2factor.in/API/V1/{settings.SMS_API_KEY}/SMS/{phone_number}/{otp}/hi how areyou"

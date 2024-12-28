@@ -44,8 +44,7 @@ class SignupInitView(APIView):
         # Email validation
         email = request.data.get('email')
         phone_number = request.data.get('contact_number')
-        print("request data----------------", request.data)
-        print("request data----------------", phone_number)
+
         try:
             validate_email(email)
         except ValidationError:
@@ -288,6 +287,7 @@ class RaiseQueryView(APIView):
                 'priority': request.data.get('priority', 'Low'),
                 'description': request.data.get('description'),
                 'status': request.data.get('status', 'Pending'),
+                'created_by': user.pk
                
             }
 
